@@ -192,14 +192,16 @@ export const performMagicClick = async (
   // Start spinning animation
   setIsSpinning(true);
   
-  // After animation duration, hide logo and select closest shop
+  // Select closest shop card immediately (don't wait for animation)
+  const selectedCard = await selectClosestShop(cards);
+  
+  // After animation duration, hide logo
   return new Promise((resolve) => {
-    setTimeout(async () => {
+    setTimeout(() => {
       setLogoHidden(true);
       setIsSpinning(false);
       
-      // Select and trigger closest shop card
-      const selectedCard = await selectClosestShop(cards);
+      // Resolve with the already selected card
       resolve(selectedCard);
     }, animationDuration);
   });
