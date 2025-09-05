@@ -14,15 +14,18 @@ import {
     Select,
     MenuItem,
     Typography,
-    Paper
+    Paper,
+    IconButton,
+    CardHeader
 } from '@mui/material';
-import { CameraAlt, Stop } from '@mui/icons-material';
+import { CameraAlt, Stop, Close } from '@mui/icons-material';
 
 interface AddCardFormProps {
     onCardAdded: () => void;
+    onClose: () => void;
 }
 
-function AddCardForm({ onCardAdded }: AddCardFormProps) {
+function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     const [storeName, setStoreName] = useState<string>('');
     const [code, setCode] = useState<string>('');
     const [barcodeType, setBarcodeType] = useState<keyof typeof BarcodeTypes>('EAN13');
@@ -165,6 +168,7 @@ function AddCardForm({ onCardAdded }: AddCardFormProps) {
             setStoreName(''); // Clear input
             setCode(''); // Clear input
             onCardAdded(); // Notify parent component to refresh the list
+            onClose(); // Close the form after successfully adding the card
         } catch (e) {
             console.error("Error adding document: ", e);
         }
@@ -184,11 +188,15 @@ function AddCardForm({ onCardAdded }: AddCardFormProps) {
 
     return (
         <>
-
-            <Typography variant="h5" component="h2" gutterBottom>
-                Add New Card
-            </Typography>
             <Card sx={{ maxWidth: 600, margin: 2 }}>
+                <CardHeader
+                    title="Add New Card"
+                    action={
+                        <IconButton onClick={onClose} aria-label="close">
+                            <Close />
+                        </IconButton>
+                    }
+                />
                 <CardContent>
                     <Box component="form" onSubmit={addCard} sx={{ mt: 2 }}>
                         <TextField

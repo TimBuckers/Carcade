@@ -151,7 +151,7 @@ function App() {
                 />
               </Box>
             )}
-            {showAddCardForm && <AddCardForm onCardAdded={fetchCards} />}
+            {showAddCardForm && <AddCardForm onCardAdded={fetchCards} onClose={() => setShowAddCardForm(false)} />}
             <CardList cards={cards} />
           </Box>
         </Box>
