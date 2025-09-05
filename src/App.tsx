@@ -5,6 +5,7 @@ import { db } from './firebase';
 import AddCardForm from './components/AddCardForm';
 import CardList from './components/CardList';
 import { type CardContent } from './types';
+import { performMagicClick } from './utils/magicClick';
 import { 
   ThemeProvider, 
   createTheme,
@@ -48,35 +49,24 @@ function App() {
       store_name: doc.data().store_name,
       code: doc.data().code,
       barcode_type: doc.data().barcode_type,
+      shop_locations: doc.data().shop_locations || null,
     }));
     console.log(cardsList);
     setCards(cardsList as CardContent[]); // Assert the final array as Card[]
   };
 
-  // Handle logo click - start spinning animation
-  const handleLogoClick = () => {
+  // Handle logo click - start spinning animation and select closest shop
+  const handleLogoClick = async () => {
     if (cards.length === 0 || isSpinning) return;
     
-    setIsSpinning(true);
-    
-    // After 2 seconds (animation duration), hide logo and select random card
-    setTimeout(() => {
-      setLogoHidden(true);
+    try {
+      await performMagicClick(cards, setIsSpinning, setLogoHidden);
+    } catch (error) {
+      console.error('Error during magic click:', error);
+      // Reset states in case of error
       setIsSpinning(false);
-      
-      // Select random card
-      if (cards.length > 0) {
-        const randomIndex = Math.floor(Math.random() * cards.length);
-        const randomCard = cards[randomIndex];
-        
-        // Trigger card selection in CardList component
-        // We'll need to modify CardList to accept an external selection
-        const cardElement = document.querySelector(`[data-card-id="${randomCard.id}"]`) as HTMLElement;
-        if (cardElement) {
-          cardElement.click();
-        }
-      }
-    }, 900);
+      setLogoHidden(false);
+    }
   };
 
   // Fetch cards on component mount
@@ -152,7 +142,7 @@ function App() {
               </Box>
             )}
             {showAddCardForm && <AddCardForm onCardAdded={fetchCards} onClose={() => setShowAddCardForm(false)} />}
-            <CardList cards={cards} />
+            <CardList cards={cards} onCardUpdated={fetchCards} />
           </Box>
         </Box>
       </Box>

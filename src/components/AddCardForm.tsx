@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { collection, addDoc } from "firebase/firestore";
 import { db } from '../firebase';
 import Quagga from '@ericblade/quagga2';
-import { BarcodeTypes } from '../types';
+import { BarcodeTypes, type ShopLocation } from '../types';
 import {
     Card,
     CardContent,
@@ -16,9 +16,12 @@ import {
     Typography,
     Paper,
     IconButton,
-    CardHeader
+    CardHeader,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails
 } from '@mui/material';
-import { CameraAlt, Stop, Close } from '@mui/icons-material';
+import { CameraAlt, Stop, Close, Add, Remove, ExpandMore, LocationOn } from '@mui/icons-material';
 
 interface AddCardFormProps {
     onCardAdded: () => void;
@@ -29,6 +32,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     const [storeName, setStoreName] = useState<string>('');
     const [code, setCode] = useState<string>('');
     const [barcodeType, setBarcodeType] = useState<keyof typeof BarcodeTypes>('EAN13');
+    const [shopLocations, setShopLocations] = useState<ShopLocation[]>([{ lat: 0, lng: 0 }]);
     const [isScanning, setIsScanning] = useState<boolean>(false);
     const [shouldStartScanning, setShouldStartScanning] = useState<boolean>(false);
     const [scanSuccess, setScanSuccess] = useState<boolean>(false);
@@ -154,19 +158,46 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
         setShouldStartScanning(false);
     };
 
+    // Functions to manage shop locations
+    const addShopLocation = () => {
+        setShopLocations([...shopLocations, { lat: 0, lng: 0 }]);
+    };
+
+    const removeShopLocation = (index: number) => {
+        if (shopLocations.length > 1) {
+            setShopLocations(shopLocations.filter((_, i) => i !== index));
+        }
+    };
+
+    const updateShopLocation = (index: number, field: 'lat' | 'lng', value: number) => {
+        const updatedLocations = shopLocations.map((location, i) => 
+            i === index ? { ...location, [field]: value } : location
+        );
+        setShopLocations(updatedLocations);
+    };
+
     // Function to add a new card
     const addCard = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault(); // Prevent form refresh
         if (storeName.trim() === '' || code.trim() === '') return;
 
+        // Validate that at least one location has valid coordinates
+        const validLocations = shopLocations.filter(loc => loc.lat !== 0 || loc.lng !== 0);
+        if (validLocations.length === 0) {
+            alert('Please add at least one valid shop location with coordinates.');
+            return;
+        }
+
         try {
             await addDoc(collection(db, import.meta.env.VITE_FIRESTORE_COLLECTION), {
                 store_name: storeName,
                 code,
-                barcode_type: barcodeType
+                barcode_type: barcodeType,
+                shop_locations: validLocations
             });
             setStoreName(''); // Clear input
             setCode(''); // Clear input
+            setShopLocations([{ lat: 0, lng: 0 }]); // Reset locations
             onCardAdded(); // Notify parent component to refresh the list
             onClose(); // Close the form after successfully adding the card
         } catch (e) {
@@ -282,6 +313,76 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                                 {isScanning ? 'Stop' : 'Scan'}
                             </Button>
                         </Box>
+
+                        {/* Shop Locations Section */}
+                        <Accordion sx={{ mt: 3 }}>
+                            <AccordionSummary expandIcon={<ExpandMore />}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <LocationOn />
+                                    <Typography variant="h6">
+                                        Shop Locations ({shopLocations.length})
+                                    </Typography>
+                                </Box>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Add the GPS coordinates for shop locations. This enables the magic click feature to find the closest shop to your current location.
+                                </Typography>
+                                
+                                {shopLocations.map((location, index) => (
+                                    <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                            <Typography variant="subtitle2">
+                                                Location {index + 1}
+                                            </Typography>
+                                            {shopLocations.length > 1 && (
+                                                <IconButton 
+                                                    size="small" 
+                                                    onClick={() => removeShopLocation(index)}
+                                                    color="error"
+                                                >
+                                                    <Remove />
+                                                </IconButton>
+                                            )}
+                                        </Box>
+                                        
+                                        <Box sx={{ display: 'flex', gap: 2 }}>
+                                            <TextField
+                                                label="Latitude"
+                                                type="number"
+                                                value={location.lat || ''}
+                                                onChange={(e) => updateShopLocation(index, 'lat', parseFloat(e.target.value) || 0)}
+                                                placeholder="e.g., 40.7128"
+                                                inputProps={{ step: 'any' }}
+                                                fullWidth
+                                            />
+                                            <TextField
+                                                label="Longitude"
+                                                type="number"
+                                                value={location.lng || ''}
+                                                onChange={(e) => updateShopLocation(index, 'lng', parseFloat(e.target.value) || 0)}
+                                                placeholder="e.g., -74.0060"
+                                                inputProps={{ step: 'any' }}
+                                                fullWidth
+                                            />
+                                        </Box>
+                                        
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                            Tip: You can find coordinates by searching on Google Maps and clicking on a location.
+                                        </Typography>
+                                    </Box>
+                                ))}
+                                
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Add />}
+                                    onClick={addShopLocation}
+                                    sx={{ mt: 1 }}
+                                >
+                                    Add Location
+                                </Button>
+                            </AccordionDetails>
+                        </Accordion>
 
                         <Button
                             type="submit"

@@ -10,10 +10,16 @@ export const BarcodeTypes = {
 
 export type BarcodeType = keyof typeof BarcodeTypes;
 
+
+export interface ShopLocation {
+  lat: number;
+  lng: number;
+}
 // Define a type for our card object for better type safety
 export interface CardContent {
   id: string;
   store_name: string;
   code: string;
   barcode_type?: BarcodeType;
+  shop_locations: ShopLocation[] | null;
 }

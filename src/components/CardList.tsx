@@ -1,7 +1,9 @@
 import JsBarcode from 'jsbarcode';
 import QRCodeStyling from 'qr-code-styling';
 import type { JSX } from 'react/jsx-runtime';
-import { type CardContent, BarcodeTypes } from '../types';
+import { type CardContent, BarcodeTypes, type ShopLocation } from '../types';
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from '../firebase';
 import {
   Card,
   CardContent as MuiCardContent,
@@ -9,18 +11,25 @@ import {
   Box,
   Chip,
   Modal,
-  IconButton
+  IconButton,
+  Tooltip,
+  Snackbar,
+  Alert
 } from '@mui/material';
-import { CreditCard, Close } from '@mui/icons-material';
+import { CreditCard, Close, LocationOn } from '@mui/icons-material';
 import { useState } from 'react';
 
 
 interface CardListProps {
   cards: CardContent[];
+  onCardUpdated: () => void;
 }
 
-function CardList({ cards }: CardListProps) {
+function CardList({ cards, onCardUpdated }: CardListProps) {
   const [selectedCard, setSelectedCard] = useState<CardContent | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
   const getBarcodeORQRImage = (code: string, barcodeType: keyof typeof BarcodeTypes): JSX.Element | null => {
     if (barcodeType === 'QRCODE') {
@@ -77,6 +86,99 @@ function CardList({ cards }: CardListProps) {
     }
   };
 
+  // Function to get current location
+  const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by this browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          reject(new Error(`Geolocation error: ${error.message}`));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        }
+      );
+    });
+  };
+
+  // Function to add current location to card's shop_locations
+  const addCurrentLocationToCard = async (card: CardContent, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent card modal from opening
+    
+    try {
+      // Get current location
+      const currentLocation = await getCurrentLocation();
+      
+      // Get existing shop_locations or create empty array
+      const existingLocations: ShopLocation[] = card.shop_locations || [];
+      
+      // Check if this location already exists (within 100m radius)
+      const locationExists = existingLocations.some(location => {
+        const distance = calculateDistance(
+          currentLocation.lat, 
+          currentLocation.lng, 
+          location.lat, 
+          location.lng
+        );
+        return distance < 0.1; // Less than 100 meters
+      });
+      
+      if (locationExists) {
+        setSnackbarMessage('This location is already saved for this card');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      // Add new location to the array
+      const updatedLocations = [...existingLocations, currentLocation];
+      
+      // Update the document in Firestore
+      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, card.id);
+      await updateDoc(cardRef, {
+        shop_locations: updatedLocations
+      });
+      
+      setSnackbarMessage(`Location added to ${card.store_name}!`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+      // Refresh the card list
+      onCardUpdated();
+      
+    } catch (error) {
+      console.error('Error adding location:', error);
+      setSnackbarMessage('Failed to add location. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
+  // Helper function to calculate distance between two points (Haversine formula)
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLng = (lng2 - lng1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   return (
     <Box sx={{ mt: 3 }}>
       <Typography variant="h5" component="h2" gutterBottom sx={{ ml: 2 }}>
@@ -106,6 +208,7 @@ function CardList({ cards }: CardListProps) {
                   display: 'flex',
                   flexDirection: 'column',
                   cursor: 'pointer',
+                  position: 'relative',
                   '&:hover': {
                     boxShadow: 6,
                     transform: 'translateY(-2px) scale(1.02)',
@@ -117,12 +220,43 @@ function CardList({ cards }: CardListProps) {
                   }
                 }}
               >
-                <MuiCardContent sx={{ flexGrow: 1, p: 2 }}>
+                {/* Location Icon */}
+                <Tooltip title={`Add current location to ${card.store_name}`}>
+                  <IconButton
+                    onClick={(e) => addCurrentLocationToCard(card, e)}
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      zIndex: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      color: card.shop_locations && card.shop_locations.length > 0 ? 'success.main' : 'action.disabled',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255, 255, 255, 1)',
+                        color: 'primary.main',
+                        transform: 'scale(1.1)',
+                      }
+                    }}
+                    size="small"
+                  >
+                    <LocationOn />
+                  </IconButton>
+                </Tooltip>
+
+                <MuiCardContent sx={{ flexGrow: 1, p: 2, pt: 5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <CreditCard sx={{ mr: 1, color: 'primary.main' }} />
                     <Typography variant="h6" component="h3" noWrap>
                       {card.store_name}
                     </Typography>
+                    {card.shop_locations && card.shop_locations.length > 0 && (
+                      <Chip 
+                        label={`${card.shop_locations.length} location${card.shop_locations.length > 1 ? 's' : ''}`}
+                        size="small" 
+                        color="success"
+                        sx={{ ml: 1, fontSize: '0.7rem' }}
+                      />
+                    )}
                   </Box>
                   
                   <Box sx={{ textAlign: 'center', mb: 2 }}>
@@ -216,6 +350,14 @@ function CardList({ cards }: CardListProps) {
                   <Typography variant="h4" component="h3" sx={{ fontWeight: 'bold' }}>
                     {selectedCard.store_name}
                   </Typography>
+                  {selectedCard.shop_locations && selectedCard.shop_locations.length > 0 && (
+                    <Box sx={{ ml: 2, display: 'flex', alignItems: 'center' }}>
+                      <LocationOn sx={{ mr: 0.5, color: 'success.main' }} />
+                      <Typography variant="body2" color="success.main">
+                        {selectedCard.shop_locations.length} location{selectedCard.shop_locations.length > 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
                 
                 <Box sx={{ 
@@ -263,6 +405,22 @@ function CardList({ cards }: CardListProps) {
           )}
         </Box>
       </Modal>
+
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={4000} 
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbarOpen(false)} 
+          severity={snackbarSeverity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
