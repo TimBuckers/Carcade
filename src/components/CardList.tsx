@@ -4,6 +4,7 @@ import type { JSX } from 'react/jsx-runtime';
 import { type CardContent, BarcodeTypes, type ShopLocation } from '../types';
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from '../firebase';
+import LocationDialog from './LocationDialog';
 import {
   Card,
   CardContent as MuiCardContent,
@@ -30,6 +31,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
 
   const getBarcodeORQRImage = (code: string, barcodeType: keyof typeof BarcodeTypes): JSX.Element | null => {
     if (barcodeType === 'QRCODE') {
@@ -179,6 +181,36 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
     return R * c;
   };
 
+  // Function to update locations for selectedCard
+  const updateSelectedCardLocations = async (newLocations: ShopLocation[]) => {
+    if (!selectedCard) return;
+    
+    try {
+      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, selectedCard.id);
+      await updateDoc(cardRef, {
+        shop_locations: newLocations
+      });
+      
+      // Update the selectedCard with new locations
+      setSelectedCard({
+        ...selectedCard,
+        shop_locations: newLocations
+      });
+      
+      onCardUpdated();
+      
+      setSnackbarMessage(`Locations updated for ${selectedCard.store_name}!`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('Error updating locations:', error);
+      setSnackbarMessage('Failed to update locations. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   return (
     <Box sx={{ mt: 3 }}>
       <Typography variant="h5" component="h2" gutterBottom sx={{ ml: 2 }}>
@@ -220,43 +252,12 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   }
                 }}
               >
-                {/* Location Icon */}
-                <Tooltip title={`Add current location to ${card.store_name}`}>
-                  <IconButton
-                    onClick={(e) => addCurrentLocationToCard(card, e)}
-                    sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      zIndex: 1,
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                      color: card.shop_locations && card.shop_locations.length > 0 ? 'success.main' : 'action.disabled',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 1)',
-                        color: 'primary.main',
-                        transform: 'scale(1.1)',
-                      }
-                    }}
-                    size="small"
-                  >
-                    <LocationOn />
-                  </IconButton>
-                </Tooltip>
-
                 <MuiCardContent sx={{ flexGrow: 1, p: 2, pt: 5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <CreditCard sx={{ mr: 1, color: 'primary.main' }} />
                     <Typography variant="h6" component="h3" noWrap>
                       {card.store_name}
                     </Typography>
-                    {card.shop_locations && card.shop_locations.length > 0 && (
-                      <Chip 
-                        label={`${card.shop_locations.length} location${card.shop_locations.length > 1 ? 's' : ''}`}
-                        size="small" 
-                        color="success"
-                        sx={{ ml: 1, fontSize: '0.7rem' }}
-                      />
-                    )}
                   </Box>
                   
                   <Box sx={{ textAlign: 'center', mb: 2 }}>
@@ -351,10 +352,48 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                     {selectedCard.store_name}
                   </Typography>
                   {selectedCard.shop_locations && selectedCard.shop_locations.length > 0 && (
-                    <Box sx={{ ml: 2, display: 'flex', alignItems: 'center' }}>
+                    <Box 
+                      sx={{ 
+                        ml: 2, 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        padding: 1,
+                        borderRadius: 1,
+                        '&:hover': {
+                          backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                      onClick={() => setLocationDialogOpen(true)}
+                    >
                       <LocationOn sx={{ mr: 0.5, color: 'success.main' }} />
                       <Typography variant="body2" color="success.main">
                         {selectedCard.shop_locations.length} location{selectedCard.shop_locations.length > 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                  )}
+                  {(!selectedCard.shop_locations || selectedCard.shop_locations.length === 0) && (
+                    <Box 
+                      sx={{ 
+                        ml: 2, 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        padding: 1,
+                        borderRadius: 1,
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                      onClick={() => setLocationDialogOpen(true)}
+                    >
+                      <LocationOn sx={{ mr: 0.5, color: 'warning.main' }} />
+                      <Typography variant="body2" color="warning.main">
+                        Add location
                       </Typography>
                     </Box>
                   )}
@@ -421,6 +460,16 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Location Dialog for selectedCard */}
+      {selectedCard && (
+        <LocationDialog
+          open={locationDialogOpen}
+          onClose={() => setLocationDialogOpen(false)}
+          shopLocations={selectedCard.shop_locations || []}
+          onUpdateLocations={updateSelectedCardLocations}
+        />
+      )}
     </Box>
   );
 }
