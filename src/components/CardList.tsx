@@ -181,93 +181,31 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
     return R * c;
   };
 
-  // Location dialog functions for selectedCard
-  const addCurrentLocationToSelectedCard = async () => {
+  // Function to update locations for selectedCard
+  const updateSelectedCardLocations = async (newLocations: ShopLocation[]) => {
     if (!selectedCard) return;
     
     try {
-      const currentLocation = await getCurrentLocation();
-      const existingLocations: ShopLocation[] = selectedCard.shop_locations || [];
-      
-      // Check if this location already exists (within 100m radius)
-      const locationExists = existingLocations.some(location => {
-        const distance = calculateDistance(
-          currentLocation.lat, 
-          currentLocation.lng, 
-          location.lat, 
-          location.lng
-        );
-        return distance < 0.1; // Less than 100 meters
-      });
-      
-      if (locationExists) {
-        setSnackbarMessage('This location is already saved for this card');
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
-        return;
-      }
-      
-      const updatedLocations = [...existingLocations, currentLocation];
       const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, selectedCard.id);
       await updateDoc(cardRef, {
-        shop_locations: updatedLocations
+        shop_locations: newLocations
       });
-      
-      setSnackbarMessage(`Location added to ${selectedCard.store_name}!`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-      setLocationDialogOpen(false);
       
       // Update the selectedCard with new locations
       setSelectedCard({
         ...selectedCard,
-        shop_locations: updatedLocations
+        shop_locations: newLocations
       });
       
       onCardUpdated();
       
-    } catch (error) {
-      console.error('Error adding location:', error);
-      setSnackbarMessage('Failed to add location. Please try again.');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    }
-  };
-
-  const addEmptyLocationToSelectedCard = () => {
-    // This would typically open a form for manual location entry
-    // For now, we'll just close the dialog
-    setLocationDialogOpen(false);
-    setSnackbarMessage('Manual location entry not implemented yet');
-    setSnackbarSeverity('error');
-    setSnackbarOpen(true);
-  };
-
-  const clearAllLocationsFromSelectedCard = async () => {
-    if (!selectedCard) return;
-    
-    try {
-      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, selectedCard.id);
-      await updateDoc(cardRef, {
-        shop_locations: []
-      });
-      
-      setSnackbarMessage(`All locations cleared from ${selectedCard.store_name}!`);
+      setSnackbarMessage(`Locations updated for ${selectedCard.store_name}!`);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
-      setLocationDialogOpen(false);
-      
-      // Update the selectedCard with empty locations
-      setSelectedCard({
-        ...selectedCard,
-        shop_locations: []
-      });
-      
-      onCardUpdated();
       
     } catch (error) {
-      console.error('Error clearing locations:', error);
-      setSnackbarMessage('Failed to clear locations. Please try again.');
+      console.error('Error updating locations:', error);
+      setSnackbarMessage('Failed to update locations. Please try again.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
@@ -529,9 +467,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
           open={locationDialogOpen}
           onClose={() => setLocationDialogOpen(false)}
           shopLocations={selectedCard.shop_locations || []}
-          onAddCurrentLocation={addCurrentLocationToSelectedCard}
-          onAddEmptyLocation={addEmptyLocationToSelectedCard}
-          onClearAllLocations={clearAllLocationsFromSelectedCard}
+          onUpdateLocations={updateSelectedCardLocations}
         />
       )}
     </Box>

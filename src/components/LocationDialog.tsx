@@ -9,36 +9,77 @@ import {
     Box,
     Typography
 } from '@mui/material';
-import { LocationOn, Add, Remove } from '@mui/icons-material';
+import { LocationOn, Remove } from '@mui/icons-material';
 import { type ShopLocation } from '../types';
 
 interface LocationDialogProps {
     open: boolean;
     onClose: () => void;
     shopLocations: ShopLocation[];
-    onAddCurrentLocation: () => Promise<void>;
-    onClearAllLocations: () => void;
+    onUpdateLocations: (locations: ShopLocation[]) => void;
 }
 
 function LocationDialog({ 
     open, 
     onClose, 
     shopLocations, 
-    onAddCurrentLocation, 
-    onClearAllLocations 
+    onUpdateLocations
 }: LocationDialogProps) {
     const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-    const handleAddCurrentLocation = async () => {
+    const addCurrentLocation = async () => {
         setIsGettingLocation(true);
         try {
-            await onAddCurrentLocation();
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by this browser'));
+                    return;
+                }
+                
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes
+                });
+            });
+
+            const newLocation: ShopLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+
+            // Check if this location already exists (within 100m)
+            const exists = (shopLocations || []).some(loc => {
+                const distance = Math.sqrt(
+                    Math.pow((loc.lat - newLocation.lat) * 111000, 2) + 
+                    Math.pow((loc.lng - newLocation.lng) * 111000, 2)
+                );
+                return distance < 100; // 100 meters
+            });
+
+            if (!exists) {
+                onUpdateLocations([...(shopLocations || []), newLocation]);
+                onClose();
+            } else {
+                alert('This location is already added (within 100m of existing location)');
+            }
+        } catch (error) {
+            alert(`Error getting location: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setIsGettingLocation(false);
         }
     };
 
-    const validLocationCount = shopLocations.filter(loc => loc.lat !== 0 || loc.lng !== 0).length;
+    const clearAllLocations = () => {
+        onUpdateLocations([]);
+        onClose();
+    };
+
+    const handleAddCurrentLocation = async () => {
+        await addCurrentLocation();
+    };
+
+    const validLocationCount = (shopLocations || []).filter(loc => loc.lat !== 0 || loc.lng !== 0).length;
 
     return (
         <Dialog
@@ -76,7 +117,7 @@ function LocationDialog({
                             variant="outlined"
                             color="error"
                             startIcon={<Remove />}
-                            onClick={onClearAllLocations}
+                            onClick={clearAllLocations}
                             fullWidth
                             sx={{ py: 1.5 }}
                         >
