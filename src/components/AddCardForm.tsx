@@ -3,6 +3,7 @@ import { collection, addDoc } from "firebase/firestore";
 import { db } from '../firebase';
 import Quagga from '@ericblade/quagga2';
 import { BarcodeTypes, type ShopLocation } from '../types';
+import LocationDialog from './LocationDialog';
 import {
     Card,
     CardContent,
@@ -36,6 +37,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     const [isScanning, setIsScanning] = useState<boolean>(false);
     const [shouldStartScanning, setShouldStartScanning] = useState<boolean>(false);
     const [scanSuccess, setScanSuccess] = useState<boolean>(false);
+    const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
     const videoRef = useRef<HTMLDivElement>(null);
 
     // Function to initiate barcode scanning
@@ -161,6 +163,55 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     // Functions to manage shop locations
     const addShopLocation = () => {
         setShopLocations([...shopLocations, { lat: 0, lng: 0 }]);
+    };
+
+    const addCurrentLocation = async () => {
+        try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by this browser'));
+                    return;
+                }
+                
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes
+                });
+            });
+
+            const newLocation: ShopLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+
+            // Check if this location already exists (within 100m)
+            const exists = shopLocations.some(loc => {
+                const distance = Math.sqrt(
+                    Math.pow((loc.lat - newLocation.lat) * 111000, 2) + 
+                    Math.pow((loc.lng - newLocation.lng) * 111000, 2)
+                );
+                return distance < 100; // 100 meters
+            });
+
+            if (!exists) {
+                setShopLocations([...shopLocations, newLocation]);
+                setLocationDialogOpen(false);
+            } else {
+                alert('This location is already added (within 100m of existing location)');
+            }
+        } catch (error) {
+            alert(`Error getting location: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    };
+
+    const clearAllLocations = () => {
+        setShopLocations([{ lat: 0, lng: 0 }]);
+        setLocationDialogOpen(false);
+    };
+
+    const openLocationDialog = () => {
+        setLocationDialogOpen(true);
     };
 
     const removeShopLocation = (index: number) => {
@@ -376,7 +427,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                                 <Button
                                     variant="outlined"
                                     startIcon={<Add />}
-                                    onClick={addShopLocation}
+                                    onClick={openLocationDialog}
                                     sx={{ mt: 1 }}
                                 >
                                     Add Location
@@ -397,6 +448,16 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                     </Box>
                 </CardContent>
             </Card>
+
+            {/* Location Options Dialog */}
+            <LocationDialog
+                open={locationDialogOpen}
+                onClose={() => setLocationDialogOpen(false)}
+                shopLocations={shopLocations}
+                onAddCurrentLocation={addCurrentLocation}
+                onAddEmptyLocation={addShopLocation}
+                onClearAllLocations={clearAllLocations}
+            />
         </>
     );
 }

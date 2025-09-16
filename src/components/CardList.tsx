@@ -4,6 +4,7 @@ import type { JSX } from 'react/jsx-runtime';
 import { type CardContent, BarcodeTypes, type ShopLocation } from '../types';
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from '../firebase';
+import LocationDialog from './LocationDialog';
 import {
   Card,
   CardContent as MuiCardContent,
@@ -30,6 +31,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
 
   const getBarcodeORQRImage = (code: string, barcodeType: keyof typeof BarcodeTypes): JSX.Element | null => {
     if (barcodeType === 'QRCODE') {
@@ -179,6 +181,98 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
     return R * c;
   };
 
+  // Location dialog functions for selectedCard
+  const addCurrentLocationToSelectedCard = async () => {
+    if (!selectedCard) return;
+    
+    try {
+      const currentLocation = await getCurrentLocation();
+      const existingLocations: ShopLocation[] = selectedCard.shop_locations || [];
+      
+      // Check if this location already exists (within 100m radius)
+      const locationExists = existingLocations.some(location => {
+        const distance = calculateDistance(
+          currentLocation.lat, 
+          currentLocation.lng, 
+          location.lat, 
+          location.lng
+        );
+        return distance < 0.1; // Less than 100 meters
+      });
+      
+      if (locationExists) {
+        setSnackbarMessage('This location is already saved for this card');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      const updatedLocations = [...existingLocations, currentLocation];
+      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, selectedCard.id);
+      await updateDoc(cardRef, {
+        shop_locations: updatedLocations
+      });
+      
+      setSnackbarMessage(`Location added to ${selectedCard.store_name}!`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      setLocationDialogOpen(false);
+      
+      // Update the selectedCard with new locations
+      setSelectedCard({
+        ...selectedCard,
+        shop_locations: updatedLocations
+      });
+      
+      onCardUpdated();
+      
+    } catch (error) {
+      console.error('Error adding location:', error);
+      setSnackbarMessage('Failed to add location. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
+  const addEmptyLocationToSelectedCard = () => {
+    // This would typically open a form for manual location entry
+    // For now, we'll just close the dialog
+    setLocationDialogOpen(false);
+    setSnackbarMessage('Manual location entry not implemented yet');
+    setSnackbarSeverity('error');
+    setSnackbarOpen(true);
+  };
+
+  const clearAllLocationsFromSelectedCard = async () => {
+    if (!selectedCard) return;
+    
+    try {
+      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, selectedCard.id);
+      await updateDoc(cardRef, {
+        shop_locations: []
+      });
+      
+      setSnackbarMessage(`All locations cleared from ${selectedCard.store_name}!`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      setLocationDialogOpen(false);
+      
+      // Update the selectedCard with empty locations
+      setSelectedCard({
+        ...selectedCard,
+        shop_locations: []
+      });
+      
+      onCardUpdated();
+      
+    } catch (error) {
+      console.error('Error clearing locations:', error);
+      setSnackbarMessage('Failed to clear locations. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   return (
     <Box sx={{ mt: 3 }}>
       <Typography variant="h5" component="h2" gutterBottom sx={{ ml: 2 }}>
@@ -220,43 +314,12 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   }
                 }}
               >
-                {/* Location Icon */}
-                <Tooltip title={`Add current location to ${card.store_name}`}>
-                  <IconButton
-                    onClick={(e) => addCurrentLocationToCard(card, e)}
-                    sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      zIndex: 1,
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                      color: card.shop_locations && card.shop_locations.length > 0 ? 'success.main' : 'action.disabled',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 1)',
-                        color: 'primary.main',
-                        transform: 'scale(1.1)',
-                      }
-                    }}
-                    size="small"
-                  >
-                    <LocationOn />
-                  </IconButton>
-                </Tooltip>
-
                 <MuiCardContent sx={{ flexGrow: 1, p: 2, pt: 5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <CreditCard sx={{ mr: 1, color: 'primary.main' }} />
                     <Typography variant="h6" component="h3" noWrap>
                       {card.store_name}
                     </Typography>
-                    {card.shop_locations && card.shop_locations.length > 0 && (
-                      <Chip 
-                        label={`${card.shop_locations.length} location${card.shop_locations.length > 1 ? 's' : ''}`}
-                        size="small" 
-                        color="success"
-                        sx={{ ml: 1, fontSize: '0.7rem' }}
-                      />
-                    )}
                   </Box>
                   
                   <Box sx={{ textAlign: 'center', mb: 2 }}>
@@ -351,10 +414,48 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                     {selectedCard.store_name}
                   </Typography>
                   {selectedCard.shop_locations && selectedCard.shop_locations.length > 0 && (
-                    <Box sx={{ ml: 2, display: 'flex', alignItems: 'center' }}>
+                    <Box 
+                      sx={{ 
+                        ml: 2, 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        padding: 1,
+                        borderRadius: 1,
+                        '&:hover': {
+                          backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                      onClick={() => setLocationDialogOpen(true)}
+                    >
                       <LocationOn sx={{ mr: 0.5, color: 'success.main' }} />
                       <Typography variant="body2" color="success.main">
                         {selectedCard.shop_locations.length} location{selectedCard.shop_locations.length > 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                  )}
+                  {(!selectedCard.shop_locations || selectedCard.shop_locations.length === 0) && (
+                    <Box 
+                      sx={{ 
+                        ml: 2, 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        padding: 1,
+                        borderRadius: 1,
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                      onClick={() => setLocationDialogOpen(true)}
+                    >
+                      <LocationOn sx={{ mr: 0.5, color: 'warning.main' }} />
+                      <Typography variant="body2" color="warning.main">
+                        Add location
                       </Typography>
                     </Box>
                   )}
@@ -421,6 +522,18 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Location Dialog for selectedCard */}
+      {selectedCard && (
+        <LocationDialog
+          open={locationDialogOpen}
+          onClose={() => setLocationDialogOpen(false)}
+          shopLocations={selectedCard.shop_locations || []}
+          onAddCurrentLocation={addCurrentLocationToSelectedCard}
+          onAddEmptyLocation={addEmptyLocationToSelectedCard}
+          onClearAllLocations={clearAllLocationsFromSelectedCard}
+        />
+      )}
     </Box>
   );
 }
