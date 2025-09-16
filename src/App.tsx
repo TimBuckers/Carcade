@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
 import { db } from './firebase';
+import { useAuth } from './contexts/AuthContext';
 import AddCardForm from './components/AddCardForm';
 import CardList from './components/CardList';
+import LoginPage from './components/LoginPage';
 import { type CardContent } from './types';
 import { performMagicClick } from './utils/magicClick';
 import { 
@@ -14,15 +16,21 @@ import {
   Toolbar,
   Typography,
   Box,
-  Button
+  Button,
+  Avatar,
+  Menu,
+  MenuItem,
+  CircularProgress
 } from '@mui/material';
-import { Add, CreditCard } from '@mui/icons-material';
+import { Add, CreditCard, AccountCircle, Logout } from '@mui/icons-material';
 
 function App() {
+  const { user, loading, logout } = useAuth();
   const [cards, setCards] = useState<CardContent[]>([]);
   const [showAddCardForm, setShowAddCardForm] = useState<boolean>(false);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [logoHidden, setLogoHidden] = useState<boolean>(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   // Create a Material-UI theme
   const theme = createTheme({
@@ -42,6 +50,7 @@ function App() {
 
   // Function to fetch all cards
   const fetchCards = async () => {
+    if (!user) return; // Only fetch cards if user is authenticated
     const querySnapshot = await getDocs(collection(db, import.meta.env.VITE_FIRESTORE_COLLECTION));
     // Explicitly type the document snapshot for clarity
     const cardsList = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
@@ -69,10 +78,57 @@ function App() {
     }
   };
 
-  // Fetch cards on component mount
+  // Fetch cards when user changes or component mounts
   useEffect(() => {
-    fetchCards();
-  }, []);
+    if (user) {
+      fetchCards();
+    }
+  }, [user]);
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh' 
+        }}>
+          <CircularProgress size={60} />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // Show login page if user is not authenticated
+  if (!user) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LoginPage />
+      </ThemeProvider>
+    );
+  }
+
+  // Handle user menu
+  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      handleUserMenuClose();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -90,10 +146,51 @@ function App() {
               {import.meta.env.VITE_APP_NAME}
             </Typography>
             {!showAddCardForm && (
-              <Button variant="outlined" color="secondary" startIcon={<Add />} onClick={() => setShowAddCardForm(true)}>
+              <Button variant="outlined" color="secondary" startIcon={<Add />} onClick={() => setShowAddCardForm(true)} sx={{ mr: 2 }}>
                 Add Card
               </Button>
             )}
+            
+            {/* User Menu */}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Button
+                onClick={handleUserMenuOpen}
+                sx={{ 
+                  color: 'white',
+                  textTransform: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}
+              >
+                {user.photoURL ? (
+                  <Avatar src={user.photoURL} alt={user.displayName || 'User'} sx={{ width: 32, height: 32 }} />
+                ) : (
+                  <AccountCircle sx={{ fontSize: 32 }} />
+                )}
+                <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                  {user.displayName || user.email}
+                </Typography>
+              </Button>
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleUserMenuClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+              >
+                <MenuItem onClick={handleLogout}>
+                  <Logout sx={{ mr: 1 }} />
+                  Sign Out
+                </MenuItem>
+              </Menu>
+            </Box>
             </Toolbar>
         </AppBar>
         <Box sx={{ mt: 4, mb: 4, flexGrow: 1, width: '100%', px: 2 }}>

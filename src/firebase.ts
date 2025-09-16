@@ -1,6 +1,7 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 // TODO: Replace the following with your app's Firebase configuration
 const firebaseConfig = {
@@ -19,6 +20,12 @@ const app = initializeApp(firebaseConfig);
 // Initialize and export Firestore
 const db = getFirestore(app);
 
+// Initialize and export Firebase Auth
+const auth = getAuth(app);
+
+// Configure Google Auth Provider
+const googleProvider = new GoogleAuthProvider();
+
 // enablePersistence(db)
 //   .catch((err: any) => {
 //       if (err.code == 'failed-precondition') {
@@ -30,4 +37,4 @@ const db = getFirestore(app);
 //       }
 //   });
 
-export { db };
+export { db, auth, googleProvider };
