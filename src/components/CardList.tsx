@@ -4,6 +4,7 @@ import type { JSX } from 'react/jsx-runtime';
 import { type CardContent, BarcodeTypes, type ShopLocation } from '../types';
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import LocationDialog from './LocationDialog';
 import {
   Card,
@@ -27,6 +28,7 @@ interface CardListProps {
 }
 
 function CardList({ cards, onCardUpdated }: CardListProps) {
+  const { user } = useAuth();
   const [selectedCard, setSelectedCard] = useState<CardContent | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
@@ -148,7 +150,9 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
       const updatedLocations = [...existingLocations, currentLocation];
       
       // Update the document in Firestore
-      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, card.id);
+      if (!user) return;
+      const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
+      const cardRef = doc(db, userCollection, card.id);
       await updateDoc(cardRef, {
         shop_locations: updatedLocations
       });
@@ -183,10 +187,11 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
 
   // Function to update locations for selectedCard
   const updateSelectedCardLocations = async (newLocations: ShopLocation[]) => {
-    if (!selectedCard) return;
+    if (!selectedCard || !user) return;
     
     try {
-      const cardRef = doc(db, import.meta.env.VITE_FIRESTORE_COLLECTION, selectedCard.id);
+      const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
+      const cardRef = doc(db, userCollection, selectedCard.id);
       await updateDoc(cardRef, {
         shop_locations: newLocations
       });

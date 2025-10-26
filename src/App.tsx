@@ -51,7 +51,8 @@ function App() {
   // Function to fetch all cards
   const fetchCards = async () => {
     if (!user) return; // Only fetch cards if user is authenticated
-    const querySnapshot = await getDocs(collection(db, import.meta.env.VITE_FIRESTORE_COLLECTION));
+    const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
+    const querySnapshot = await getDocs(collection(db, userCollection));
     // Explicitly type the document snapshot for clarity
     const cardsList = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
       id: doc.id,

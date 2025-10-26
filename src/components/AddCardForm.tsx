@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { collection, addDoc } from "firebase/firestore";
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import Quagga from '@ericblade/quagga2';
 import { BarcodeTypes, type ShopLocation } from '../types';
 import LocationDialog from './LocationDialog';
@@ -30,6 +31,7 @@ interface AddCardFormProps {
 }
 
 function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
+    const { user } = useAuth();
     const [storeName, setStoreName] = useState<string>('');
     const [code, setCode] = useState<string>('');
     const [barcodeType, setBarcodeType] = useState<keyof typeof BarcodeTypes>('EAN13');
@@ -166,10 +168,11 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     // Function to add a new card
     const addCard = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault(); // Prevent form refresh
-        if (storeName.trim() === '' || code.trim() === '') return;
+        if (storeName.trim() === '' || code.trim() === '' || !user) return;
 
         try {
-            await addDoc(collection(db, import.meta.env.VITE_FIRESTORE_COLLECTION), {
+            const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
+            await addDoc(collection(db, userCollection), {
                 store_name: storeName,
                 code,
                 barcode_type: barcodeType,
