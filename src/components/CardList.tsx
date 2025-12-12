@@ -14,7 +14,6 @@ import {
   Chip,
   Modal,
   IconButton,
-  Tooltip,
   Snackbar,
   Alert
 } from '@mui/material';
@@ -88,101 +87,6 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
         console.error('Error generating barcode:', error);
         return <div>Error generating barcode</div>;
     }
-  };
-
-  // Function to get current location
-  const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by this browser'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          reject(new Error(`Geolocation error: ${error.message}`));
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000 // 5 minutes
-        }
-      );
-    });
-  };
-
-  // Function to add current location to card's shop_locations
-  const addCurrentLocationToCard = async (card: CardContent, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent card modal from opening
-    
-    try {
-      // Get current location
-      const currentLocation = await getCurrentLocation();
-      
-      // Get existing shop_locations or create empty array
-      const existingLocations: ShopLocation[] = card.shop_locations || [];
-      
-      // Check if this location already exists (within 100m radius)
-      const locationExists = existingLocations.some(location => {
-        const distance = calculateDistance(
-          currentLocation.lat, 
-          currentLocation.lng, 
-          location.lat, 
-          location.lng
-        );
-        return distance < 0.1; // Less than 100 meters
-      });
-      
-      if (locationExists) {
-        setSnackbarMessage('This location is already saved for this card');
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
-        return;
-      }
-      
-      // Add new location to the array
-      const updatedLocations = [...existingLocations, currentLocation];
-      
-      // Update the document in Firestore
-      if (!user) return;
-      const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
-      const cardRef = doc(db, userCollection, card.id);
-      await updateDoc(cardRef, {
-        shop_locations: updatedLocations
-      });
-      
-      setSnackbarMessage(`Location added to ${card.store_name}!`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-      
-      // Refresh the card list
-      onCardUpdated();
-      
-    } catch (error) {
-      console.error('Error adding location:', error);
-      setSnackbarMessage('Failed to add location. Please try again.');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    }
-  };
-
-  // Helper function to calculate distance between two points (Haversine formula)
-  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLng = (lng2 - lng1) * (Math.PI / 180);
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
   };
 
   // Function to update locations for selectedCard

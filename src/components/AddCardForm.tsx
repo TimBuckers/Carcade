@@ -3,8 +3,7 @@ import { collection, addDoc } from "firebase/firestore";
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import Quagga from '@ericblade/quagga2';
-import { BarcodeTypes, type ShopLocation } from '../types';
-import LocationDialog from './LocationDialog';
+import { BarcodeTypes } from '../types';
 import {
     Card,
     CardContent,
@@ -18,12 +17,9 @@ import {
     Typography,
     Paper,
     IconButton,
-    CardHeader,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails
+    CardHeader
 } from '@mui/material';
-import { CameraAlt, Stop, Close, Add, Remove, ExpandMore, LocationOn } from '@mui/icons-material';
+import { CameraAlt, Stop, Close } from '@mui/icons-material';
 
 interface AddCardFormProps {
     onCardAdded: () => void;
@@ -38,7 +34,6 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     const [isScanning, setIsScanning] = useState<boolean>(false);
     const [shouldStartScanning, setShouldStartScanning] = useState<boolean>(false);
     const [scanSuccess, setScanSuccess] = useState<boolean>(false);
-    const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
     const videoRef = useRef<HTMLDivElement>(null);
 
     // Function to initiate barcode scanning
@@ -159,10 +154,6 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
         }
         setIsScanning(false);
         setShouldStartScanning(false);
-    };
-
-    const openLocationDialog = () => {
-        setLocationDialogOpen(true);
     };
 
     // Function to add a new card
@@ -309,12 +300,6 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                     </Box>
                 </CardContent>
             </Card>
-
-            {/* Location Options Dialog */}
-            <LocationDialog
-                open={locationDialogOpen}
-                onClose={() => setLocationDialogOpen(false)}
-            />
         </>
     );
 }
