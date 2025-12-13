@@ -37,7 +37,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
   const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
 
   const getBarcodeORQRImage = (code: string, barcodeType: keyof typeof BarcodeTypes): JSX.Element | null => {
-    if (barcodeType === 'QRCODE') {
+    if (barcodeType === BarcodeTypes.QRCODE as any) {
         // For QR codes, create a div container that QRCodeStyling can render into
         const qrCode = new QRCodeStyling({
             width: UI.QR_CODE_SIZE,
