@@ -2,10 +2,12 @@ import JsBarcode from 'jsbarcode';
 import QRCodeStyling from 'qr-code-styling';
 import type { JSX } from 'react/jsx-runtime';
 import { type CardContent, BarcodeTypes, type ShopLocation } from '../types';
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import LocationDialog from './LocationDialog';
+import { UI } from '../constants';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { logger } from '../utils/logger';
 import {
   Card,
   CardContent as MuiCardContent,
@@ -38,8 +40,8 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
     if (barcodeType === 'QRCODE') {
         // For QR codes, create a div container that QRCodeStyling can render into
         const qrCode = new QRCodeStyling({
-            width: 200,
-            height: 200,
+            width: UI.QR_CODE_SIZE,
+            height: UI.QR_CODE_SIZE,
             data: code,
             image: undefined,
             dotsOptions: {
@@ -79,12 +81,12 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
         JsBarcode(canvas, code, {
             format: BarcodeTypes[barcodeType],
             displayValue: true,
-            width: 2,
-            height: 100
+            width: UI.BARCODE_WIDTH,
+            height: UI.BARCODE_HEIGHT
         });
         return <img src={canvas.toDataURL("image/png")} alt={`Barcode for ${code}`} />;
     } catch (error) {
-        console.error('Error generating barcode:', error);
+        logger.error('Error generating barcode:', error);
         return <div>Error generating barcode</div>;
     }
   };

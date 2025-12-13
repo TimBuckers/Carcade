@@ -1,6 +1,6 @@
 // src/App.tsx
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc, setDoc, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext';
 import AddCardForm from './components/AddCardForm';
@@ -10,6 +10,10 @@ import SharedUsersManager from './components/SharedUsersManager';
 import UserProfileManager from './components/UserProfileManager';
 import { type CardContent, type UserProfile } from './types';
 import { performMagicClick } from './utils/magicClick';
+import { getProfilePath } from './utils/firebasePaths';
+import { fetchAllCards } from './services/cardService';
+import { logger } from './utils/logger';
+import { handleError, ERROR_MESSAGES } from './utils/errorHandler';
 import { 
   ThemeProvider, 
   createTheme,
@@ -54,59 +58,13 @@ function App() {
 
   // Function to fetch all cards (own cards + shared cards)
   const fetchCards = async () => {
-    if (!user) return; // Only fetch cards if user is authenticated
+    if (!user) return;
     
     try {
-      // Fetch user's own cards
-      const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
-      const ownCardsSnapshot = await getDocs(collection(db, userCollection));
-      const ownCards = ownCardsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-        id: doc.id,
-        store_name: doc.data().store_name,
-        code: doc.data().code,
-        barcode_type: doc.data().barcode_type,
-        shop_locations: doc.data().shop_locations || null,
-      }));
-
-      const allCards = [...ownCards];
-      
-      // Fetch cards from users who are sharing with the current user
-      // Use the sharing_with_me collection for efficient lookup
-      try {
-        const sharingWithMeCollection = `users/${user.uid}/sharing_with_me`;
-        const sharingSnapshot = await getDocs(collection(db, sharingWithMeCollection));
-        
-        for (const sharingDoc of sharingSnapshot.docs) {
-          const sharingData = sharingDoc.data();
-          const otherUserId = sharingData.userId;
-          
-          console.log('Fetching shared cards from user:', otherUserId);
-          
-          // Fetch cards from this user who is sharing with us
-          const sharedCardsCollection = `users/${otherUserId}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
-          const sharedCardsSnapshot = await getDocs(collection(db, sharedCardsCollection));
-          
-          const sharedCards = sharedCardsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-            id: `${otherUserId}_${doc.id}`, // Prefix with owner ID to make unique
-            store_name: doc.data().store_name,
-            code: doc.data().code,
-            barcode_type: doc.data().barcode_type,
-            shop_locations: doc.data().shop_locations || null,
-            ownerId: otherUserId,
-            ownerEmail: sharingData.email || 'Shared Card',
-          }));
-          
-          allCards.push(...sharedCards);
-        }
-      } catch (sharedError) {
-        console.error('Error fetching shared cards:', sharedError);
-        // Continue with own cards even if shared fetch fails
-      }
-      
-      console.log('Loaded cards:', allCards);
-      setCards(allCards as CardContent[]);
+      const allCards = await fetchAllCards(user.uid);
+      setCards(allCards);
     } catch (error) {
-      console.error('Error fetching cards:', error);
+      handleError(error, 'Error fetching cards');
     }
   };
 
@@ -115,7 +73,7 @@ function App() {
     if (!user || !user.email) return;
     
     try {
-      const profileRef = doc(db, 'users', user.uid, 'profile', 'info');
+      const profileRef = doc(db, getProfilePath(user.uid));
       const profileDoc = await getDoc(profileRef);
       
       if (!profileDoc.exists()) {
@@ -124,10 +82,10 @@ function App() {
           createdAt: new Date(),
         };
         await setDoc(profileRef, newProfile);
-        console.log('User profile initialized');
+        logger.debug('User profile initialized');
       }
     } catch (error) {
-      console.error('Error initializing user profile:', error);
+      handleError(error, 'Error initializing user profile');
     }
   };
 
@@ -138,7 +96,7 @@ function App() {
     try {
       await performMagicClick(cards, setIsSpinning, setLogoHidden);
     } catch (error) {
-      console.error('Error during magic click:', error);
+      handleError(error, 'Error during magic click');
       // Reset states in case of error
       setIsSpinning(false);
       setLogoHidden(false);
@@ -194,7 +152,7 @@ function App() {
       await logout();
       handleUserMenuClose();
     } catch (error) {
-      console.error('Error logging out:', error);
+      handleError(error, ERROR_MESSAGES.LOGOUT_FAILED);
     }
   };
 

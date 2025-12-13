@@ -3,6 +3,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { type UserProfile } from '../types';
+import { getProfilePath } from '../utils/firebasePaths';
+import { handleError, validateUsername, ERROR_MESSAGES } from '../utils/errorHandler';
 import {
   Box,
   Typography,
@@ -39,7 +41,7 @@ function UserProfileManager({ open, onClose }: UserProfileManagerProps) {
     
     setLoading(true);
     try {
-      const profileRef = doc(db, 'users', user.uid, 'profile', 'info');
+      const profileRef = doc(db, getProfilePath(user.uid));
       const profileDoc = await getDoc(profileRef);
       
       if (profileDoc.exists()) {
@@ -57,8 +59,8 @@ function UserProfileManager({ open, onClose }: UserProfileManagerProps) {
         setUsername('');
       }
     } catch (err) {
-      console.error('Error fetching profile:', err);
-      setError('Failed to load profile');
+      handleError(err, 'Error fetching profile');
+      setError(ERROR_MESSAGES.PROFILE_FETCH_FAILED);
     } finally {
       setLoading(false);
     }
@@ -68,14 +70,10 @@ function UserProfileManager({ open, onClose }: UserProfileManagerProps) {
   const handleSaveProfile = async () => {
     if (!user) return;
     
-    // Validate username if provided
-    if (username.trim()) {
-      // Basic validation: alphanumeric, underscores, hyphens, 3-30 chars
-      const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/;
-      if (!usernameRegex.test(username.trim())) {
-        setError('Username must be 3-30 characters and contain only letters, numbers, underscores, or hyphens');
-        return;
-      }
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+      setError(usernameError);
+      return;
     }
 
     setSaving(true);
@@ -83,7 +81,7 @@ function UserProfileManager({ open, onClose }: UserProfileManagerProps) {
     setSuccess('');
     
     try {
-      const profileRef = doc(db, 'users', user.uid, 'profile', 'info');
+      const profileRef = doc(db, getProfilePath(user.uid));
       const updatedProfile: UserProfile = {
         email: user.email || '',
         username: username.trim() || undefined,
@@ -95,8 +93,8 @@ function UserProfileManager({ open, onClose }: UserProfileManagerProps) {
       setProfile(updatedProfile);
       setSuccess('Profile updated successfully!');
     } catch (err) {
-      console.error('Error saving profile:', err);
-      setError('Failed to save profile. Please try again.');
+      handleError(err, 'Error saving profile');
+      setError(ERROR_MESSAGES.PROFILE_UPDATE_FAILED);
     } finally {
       setSaving(false);
     }

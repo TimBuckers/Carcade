@@ -11,6 +11,8 @@ import {
 } from '@mui/material';
 import { LocationOn, Remove } from '@mui/icons-material';
 import { type ShopLocation } from '../types';
+import { getCurrentLocation, areLocationsDuplicate, isValidLocation } from '../utils/geolocation';
+import { handleError } from '../utils/errorHandler';
 
 interface LocationDialogProps {
     open: boolean;
@@ -30,32 +32,12 @@ function LocationDialog({
     const addCurrentLocation = async () => {
         setIsGettingLocation(true);
         try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error('Geolocation is not supported by this browser'));
-                    return;
-                }
-                
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 300000 // 5 minutes
-                });
-            });
+            const newLocation = await getCurrentLocation();
 
-            const newLocation: ShopLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            };
-
-            // Check if this location already exists (within 100m)
-            const exists = (shopLocations || []).some(loc => {
-                const distance = Math.sqrt(
-                    Math.pow((loc.lat - newLocation.lat) * 111000, 2) + 
-                    Math.pow((loc.lng - newLocation.lng) * 111000, 2)
-                );
-                return distance < 100; // 100 meters
-            });
+            // Check if this location already exists (within threshold)
+            const exists = (shopLocations || []).some(loc => 
+                areLocationsDuplicate(loc, newLocation)
+            );
 
             if (!exists) {
                 onUpdateLocations([...(shopLocations || []), newLocation]);
@@ -64,7 +46,8 @@ function LocationDialog({
                 alert('This location is already added (within 100m of existing location)');
             }
         } catch (error) {
-            alert(`Error getting location: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const errorMessage = handleError(error, 'Error getting location');
+            alert(errorMessage);
         } finally {
             setIsGettingLocation(false);
         }
@@ -79,7 +62,7 @@ function LocationDialog({
         await addCurrentLocation();
     };
 
-    const validLocationCount = (shopLocations || []).filter(loc => loc.lat !== 0 || loc.lng !== 0).length;
+    const validLocationCount = (shopLocations || []).filter(isValidLocation).length;
 
     return (
         <Dialog

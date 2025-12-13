@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
-import { collection, addDoc } from "firebase/firestore";
-import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import Quagga from '@ericblade/quagga2';
 import { BarcodeTypes } from '../types';
+import { addCard } from '../services/cardService';
+import { logger } from '../utils/logger';
+import { handleError, ERROR_MESSAGES } from '../utils/errorHandler';
+import { BARCODE_SCANNER, UI } from '../constants';
 import {
     Card,
     CardContent,
@@ -56,32 +58,31 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                             type: "LiveStream",
                             target: videoRef.current,
                             constraints: {
-                                width: 400,
-                                height: 300,
-                                facingMode: "environment"
+                                width: UI.VIDEO_WIDTH,
+                                height: UI.VIDEO_HEIGHT,
+                                facingMode: BARCODE_SCANNER.FACING_MODE
                             }
                         },
                         locator: {
-                            patchSize: "medium",
-                            halfSample: true
+                            patchSize: BARCODE_SCANNER.PATCH_SIZE,
+                            halfSample: BARCODE_SCANNER.HALF_SAMPLE
                         },
-                        numOfWorkers: 2,
+                        numOfWorkers: BARCODE_SCANNER.NUM_WORKERS,
                         decoder: {
                             readers: [
                                 "code_128_reader",
                                 "ean_reader",
                                 "code_39_reader",
                                 "code_39_vin_reader"
-                                // "ean_8_reader",
                             ]
                         },
                         locate: true
                     }, (err: any) => {
                         if (err) {
-                            console.error('Error initializing Quagga:', err);
+                            logger.error('Error initializing Quagga:', err);
                             setIsScanning(false);
                             setShouldStartScanning(false);
-                            alert('Error initializing barcode scanner: ' + err.message);
+                            alert(ERROR_MESSAGES.SCANNER_INIT_FAILED + ': ' + err.message);
                             return;
                         }
 
@@ -94,7 +95,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
 
                             setBarcodeType(detectedFormat);
 
-                            console.log('Barcode detected:', {
+                            logger.debug('Barcode detected:', {
                                 code: result.codeResult.code,
                                 detectedFormat,
                                 mappedType: detectedFormat
@@ -125,17 +126,17 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                     });
 
                 } catch (error) {
-                    console.error('Error starting scanner:', error);
+                    logger.error('Error starting scanner:', error);
                     setIsScanning(false);
                     setShouldStartScanning(false);
 
                     const err = error as any;
                     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                        alert('Camera permission denied. Please allow camera access in your browser settings and try again.');
+                        alert(ERROR_MESSAGES.SCANNER_PERMISSION_DENIED);
                     } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
                         alert('No camera found on this device.');
                     } else {
-                        alert('Error accessing camera. Please check your camera permissions and try again.');
+                        alert(ERROR_MESSAGES.SCANNER_INIT_FAILED);
                     }
                 }
             }
@@ -150,31 +151,31 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
             Quagga.stop();
             Quagga.offDetected((_result: any) => { });
         } catch (error) {
-            console.error('Error stopping scanner:', error);
+            logger.error('Error stopping scanner:', error);
         }
         setIsScanning(false);
         setShouldStartScanning(false);
     };
 
     // Function to add a new card
-    const addCard = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault(); // Prevent form refresh
+    const addCardHandler = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
         if (storeName.trim() === '' || code.trim() === '' || !user) return;
 
         try {
-            const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
-            await addDoc(collection(db, userCollection), {
+            await addCard(user.uid, {
                 store_name: storeName,
                 code,
                 barcode_type: barcodeType,
                 shop_locations: []
             });
-            setStoreName(''); // Clear input
-            setCode(''); // Clear input
-            onCardAdded(); // Notify parent component to refresh the list
-            onClose(); // Close the form after successfully adding the card
+            setStoreName('');
+            setCode('');
+            onCardAdded();
+            onClose();
         } catch (e) {
-            console.error("Error adding document: ", e);
+            const errorMessage = handleError(e, 'Error adding card');
+            alert(errorMessage);
         }
     };
 
@@ -185,7 +186,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                 Quagga.stop();
                 Quagga.offDetected((_result: any) => { });
             } catch (error) {
-                console.log('Cleanup error:', error);
+                logger.debug('Cleanup error:', error);
             }
         };
     }, []);
@@ -202,7 +203,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                     }
                 />
                 <CardContent>
-                    <Box component="form" onSubmit={addCard} sx={{ mt: 2 }}>
+                    <Box component="form" onSubmit={addCardHandler} sx={{ mt: 2 }}>
                         <TextField
                             fullWidth
                             label="Store Name"

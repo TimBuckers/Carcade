@@ -1,66 +1,14 @@
 import { type CardContent, type ShopLocation } from '../types';
+import { getCurrentLocation, calculateDistance, type Location } from './geolocation';
+import { ANIMATION } from '../constants';
+import { logger } from './logger';
 
-// Types for location and nearby shops
-interface Location {
-  lat: number;
-  lng: number;
-}
-
+// Types for nearby shops
 interface ShopWithDistance {
   card: CardContent;
   location: ShopLocation;
   distance: number;
 }
-
-/**
- * Get the user's current location using the Geolocation API
- * @returns Promise<Location> - The user's current location
- */
-const getCurrentLocation = (): Promise<Location> => {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by this browser'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-      },
-      (error) => {
-        reject(new Error(`Geolocation error: ${error.message}`));
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes
-      }
-    );
-  });
-};
-
-/**
- * Calculate the distance between two points using the Haversine formula
- * @param lat1 - Latitude of first point
- * @param lng1 - Longitude of first point
- * @param lat2 - Latitude of second point
- * @param lng2 - Longitude of second point
- * @returns Distance in kilometers
- */
-const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLng = (lng2 - lng1) * (Math.PI / 180);
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 /**
  * Find all shops with their distances from the user's location
@@ -75,7 +23,7 @@ const findNearbyShopsFromCards = (userLocation: Location, cards: CardContent[]):
   for (const card of cards) {
     if (!card.shop_locations) continue;
     for (const shopLocation of card.shop_locations) {
-      console.log(shopLocation);
+      logger.debug('Processing shop location:', shopLocation);
       const distance = calculateDistance(
         userLocation.lat,
         userLocation.lng,
@@ -143,14 +91,14 @@ export const selectClosestShop = async (cards: CardContent[]): Promise<CardConte
         const shopsWithDistances = findNearbyShopsFromCards(userLocation, cards);
         
         if (shopsWithDistances.length === 0) {
-            console.warn('No shop locations found in cards, falling back to random selection');
+            logger.warn('No shop locations found in cards, falling back to random selection');
             return selectRandomCard(cards);
         }
         
         // Get the closest shop
         const closestShop = shopsWithDistances[0];
         
-        console.log(`Found closest shop: ${closestShop.card.store_name} (${closestShop.distance.toFixed(2)}km away)`);
+        logger.debug(`Found closest shop: ${closestShop.card.store_name} (${closestShop.distance.toFixed(2)}km away)`);
         
         // Trigger card selection in CardList component
         const cardElement = document.querySelector(`[data-card-id="${closestShop.card.id}"]`) as HTMLElement;
@@ -161,10 +109,10 @@ export const selectClosestShop = async (cards: CardContent[]): Promise<CardConte
         return closestShop.card;
         
     } catch (error) {
-        console.error('Error finding closest shop:', error);
+        logger.error('Error finding closest shop:', error);
         
         // Fall back to random selection on any error
-        console.warn('Falling back to random selection due to error');
+        logger.warn('Falling back to random selection due to error');
         return selectRandomCard(cards);
     }
 };
@@ -182,7 +130,7 @@ export const performMagicClick = async (
   cards: CardContent[],
   setIsSpinning: (spinning: boolean) => void,
   setLogoHidden: (hidden: boolean) => void,
-  animationDuration: number = 900
+  animationDuration: number = ANIMATION.MAGIC_CLICK_DURATION
 ): Promise<CardContent | null> => {
   // Don't proceed if no cards or already spinning
   if (cards.length === 0) {

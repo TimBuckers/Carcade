@@ -3,6 +3,8 @@ import { collection, getDocs, deleteDoc, doc, query, where, collectionGroup, set
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { type SharedUser } from '../types';
+import { getSharedWithPath, getSharingWithMePath, getProfileCollectionName } from '../utils/firebasePaths';
+import { handleError, validateEmail, ERROR_MESSAGES } from '../utils/errorHandler';
 import {
   Box,
   Typography,
@@ -40,7 +42,7 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
     if (!user) return;
     
     try {
-      const sharedWithCollection = `users/${user.uid}/shared_with`;
+      const sharedWithCollection = getSharedWithPath(user.uid);
       const querySnapshot = await getDocs(collection(db, sharedWithCollection));
       const usersList = querySnapshot.docs.map((doc) => ({
         id: doc.id,
@@ -49,8 +51,8 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
       }));
       setSharedUsers(usersList);
     } catch (err) {
-      console.error('Error fetching shared users:', err);
-      setError('Failed to load shared users');
+      handleError(err, 'Error fetching shared users');
+      setError(ERROR_MESSAGES.SHARE_FETCH_FAILED);
     }
   };
 
@@ -58,36 +60,35 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
   const handleAddUser = async () => {
     if (!user) return;
     
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailInput)) {
-      setError('Please enter a valid email address');
+    const emailError = validateEmail(emailInput);
+    if (emailError) {
+      setError(emailError);
       return;
     }
 
     // Prevent adding your own email
     if (emailInput.toLowerCase() === user.email?.toLowerCase()) {
-      setError('You cannot share with yourself');
+      setError(ERROR_MESSAGES.CANNOT_SHARE_SELF);
       return;
     }
 
     // Check if user is already in the list
     if (sharedUsers.some(u => u.email.toLowerCase() === emailInput.toLowerCase())) {
-      setError('This user is already in your sharing list');
+      setError(ERROR_MESSAGES.ALREADY_SHARING);
       return;
     }
 
     try {
       // Find the user by email in their profile
       const profilesQuery = query(
-        collectionGroup(db, 'profile'),
+        collectionGroup(db, getProfileCollectionName()),
         where('email', '==', emailInput.toLowerCase())
       );
       
       const profileSnapshot = await getDocs(profilesQuery);
       
       if (profileSnapshot.empty) {
-        setError('User with this email not found. They need to log in at least once.');
+        setError(ERROR_MESSAGES.USER_NOT_FOUND);
         return;
       }
       
@@ -98,7 +99,7 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
       
       // Create both entries for bidirectional lookup:
       // 1. In current user's shared_with collection
-      const sharedWithCollection = `users/${user.uid}/shared_with`;
+      const sharedWithCollection = getSharedWithPath(user.uid);
       await setDoc(doc(db, sharedWithCollection, targetUserId), {
         email: emailInput.toLowerCase(),
         userId: targetUserId,
@@ -106,7 +107,7 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
       });
       
       // 2. In target user's sharing_with_me collection (reverse index)
-      const sharingWithMeCollection = `users/${targetUserId}/sharing_with_me`;
+      const sharingWithMeCollection = getSharingWithMePath(targetUserId);
       await setDoc(doc(db, sharingWithMeCollection, user.uid), {
         email: user.email?.toLowerCase(),
         userId: user.uid,
@@ -118,8 +119,8 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
       setError('');
       fetchSharedUsers();
     } catch (err) {
-      console.error('Error adding shared user:', err);
-      setError('Failed to add user. Please try again.');
+      handleError(err, 'Error adding shared user');
+      setError(ERROR_MESSAGES.SHARE_ADD_FAILED);
     }
   };
 
@@ -129,18 +130,18 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
     
     try {
       // Delete from current user's shared_with collection
-      const sharedWithCollection = `users/${user.uid}/shared_with`;
+      const sharedWithCollection = getSharedWithPath(user.uid);
       await deleteDoc(doc(db, sharedWithCollection, userId));
       
       // Delete from target user's sharing_with_me collection (reverse index)
-      const sharingWithMeCollection = `users/${userId}/sharing_with_me`;
+      const sharingWithMeCollection = getSharingWithMePath(userId);
       await deleteDoc(doc(db, sharingWithMeCollection, user.uid));
       
       setSuccess(`Removed ${email} from your sharing list`);
       fetchSharedUsers();
     } catch (err) {
-      console.error('Error removing shared user:', err);
-      setError('Failed to remove user. Please try again.');
+      handleError(err, 'Error removing shared user');
+      setError(ERROR_MESSAGES.SHARE_REMOVE_FAILED);
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { handleError, ERROR_MESSAGES } from '../utils/errorHandler';
 import {
   Box,
   Card,
@@ -23,8 +24,8 @@ const LoginPage: React.FC = () => {
       setError('');
       await signInWithGoogle();
     } catch (error) {
-      console.error('Login error:', error);
-      setError('Failed to sign in with Google. Please try again.');
+      handleError(error, 'Login error');
+      setError(ERROR_MESSAGES.AUTH_FAILED);
     } finally {
       setLoading(false);
     }

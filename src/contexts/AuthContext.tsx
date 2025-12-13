@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { type User, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
+import { logger } from '../utils/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -32,17 +33,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const handleRedirectResult = async () => {
       try {
-        console.log('Checking for redirect result...');
+        logger.debug('Checking for redirect result...');
         const result = await getRedirectResult(auth);
         if (result) {
-          // User successfully signed in via redirect
-          console.log('User signed in via redirect:', result.user);
+          logger.debug('User signed in via redirect:', result.user);
           setUser(result.user);
         } else {
-          console.log('No redirect result found');
+          logger.debug('No redirect result found');
         }
       } catch (error) {
-        console.error('Error handling redirect result:', error);
+        logger.error('Error handling redirect result:', error);
       } finally {
         setInitializing(false);
       }
@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (initializing) return;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user?.email || 'null');
+      logger.debug('Auth state changed:', user?.email || 'null');
       setUser(user);
       setLoading(false);
     });
@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await signInWithPopup(auth, googleProvider);
       }
     } catch (error) {
-      console.error('Error signing in with Google:', error);
+      logger.error('Error signing in with Google:', error);
       throw error;
     }
   };
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await signOut(auth);
     } catch (error) {
-      console.error('Error signing out:', error);
+      logger.error('Error signing out:', error);
       throw error;
     }
   };
