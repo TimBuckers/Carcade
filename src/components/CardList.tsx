@@ -250,7 +250,8 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   flexDirection: 'column',
                   cursor: 'pointer',
                   position: 'relative',
-                  background: cardColors.primary,
+                  border: `4px solid ${cardColors.secondary}`,
+                  borderRadius: '10px',
                   '&:hover': {
                     boxShadow: 6,
                     transform: 'translateY(-2px) scale(1.02)',
@@ -275,7 +276,8 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                     mb: 2,
                     display: 'inline-flex',
                     width: '100%',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    pointerEvents: 'none'
                   }}>
                     <Box sx={{
                       backgroundColor: '#fff',
