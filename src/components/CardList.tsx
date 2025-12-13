@@ -273,20 +273,19 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
               </IconButton>
               
               <MuiCardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                  <CreditCard sx={{ mr: 2, color: 'primary.main', fontSize: 40 }} />
-                  <Typography variant="h4" component="h3" sx={{ fontWeight: 'bold' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                  <Typography variant="h4" component="h3" sx={{ fontWeight: 'bold', flexGrow: 1, minWidth: 0, wordBreak: 'break-word' }}>
                     {selectedCard.store_name}
                   </Typography>
                   {selectedCard.shop_locations && selectedCard.shop_locations.length > 0 && (
                     <Box 
                       sx={{ 
-                        ml: 2, 
                         display: 'flex', 
                         alignItems: 'center',
                         cursor: 'pointer',
                         padding: 1,
                         borderRadius: 1,
+                        flexShrink: 0,
                         '&:hover': {
                           backgroundColor: 'rgba(76, 175, 80, 0.1)',
                           transform: 'scale(1.05)',
@@ -296,7 +295,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                       onClick={() => setLocationDialogOpen(true)}
                     >
                       <LocationOn sx={{ mr: 0.5, color: 'success.main' }} />
-                      <Typography variant="body2" color="success.main">
+                      <Typography variant="body2" color="success.main" sx={{ whiteSpace: 'nowrap' }}>
                         {selectedCard.shop_locations.length} location{selectedCard.shop_locations.length > 1 ? 's' : ''}
                       </Typography>
                     </Box>
@@ -304,12 +303,12 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   {(!selectedCard.shop_locations || selectedCard.shop_locations.length === 0) && (
                     <Box 
                       sx={{ 
-                        ml: 2, 
                         display: 'flex', 
                         alignItems: 'center',
                         cursor: 'pointer',
                         padding: 1,
                         borderRadius: 1,
+                        flexShrink: 0,
                         '&:hover': {
                           backgroundColor: 'rgba(255, 152, 0, 0.1)',
                           transform: 'scale(1.05)',
@@ -319,7 +318,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                       onClick={() => setLocationDialogOpen(true)}
                     >
                       <LocationOn sx={{ mr: 0.5, color: 'warning.main' }} />
-                      <Typography variant="body2" color="warning.main">
+                      <Typography variant="body2" color="warning.main" sx={{ whiteSpace: 'nowrap' }}>
                         Add location
                       </Typography>
                     </Box>
