@@ -209,13 +209,23 @@ function App() {
       }}>
         <AppBar position="static" sx={{ width: '100%' }}>
             <Toolbar>
-            <CreditCard sx={{ mr: 2 }} />
+            <CreditCard sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }} />
                         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               {import.meta.env.VITE_APP_NAME}
             </Typography>
             {!showAddCardForm && (
-              <Button variant="outlined" color="secondary" startIcon={<Add />} onClick={() => setShowAddCardForm(true)} sx={{ mr: 2 }}>
-                Add Card
+              <Button 
+                variant="outlined" 
+                color="secondary" 
+                startIcon={<Add />} 
+                onClick={() => setShowAddCardForm(true)} 
+                sx={{ 
+                  mr: 2,
+                  px: { xs: 1, sm: 2 },
+                  py: { xs: 0.5, sm: 1 }
+                }}
+              >
+                Card
               </Button>
             )}
             

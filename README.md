@@ -10,6 +10,40 @@ CardCade is a React-based customer card management application with barcode scan
 - 🔥 **Firebase Integration**: Cloud storage for all your customer cards
 - 📱 **Responsive Design**: Works on mobile and desktop devices
 - 🎨 **Material Design**: Clean, modern UI with Material-UI components
+- 💾 **Progressive Web App (PWA)**: Install on Android and iOS devices, works offline with service worker caching
+
+## PWA Features
+
+CardCade is a fully-featured Progressive Web App that can be installed on both Android and iOS devices:
+
+### Installation
+
+**Android (Chrome/Edge):**
+1. Open the app in Chrome or Edge
+2. Tap the menu (three dots) and select "Install app" or "Add to Home Screen"
+3. The app will be installed and can be launched from your home screen
+
+**iOS (Safari):**
+1. Open the app in Safari
+2. Tap the Share button (square with arrow)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" to confirm
+5. The app will appear on your home screen
+
+### Offline Support
+
+The PWA includes a service worker that caches resources for offline use:
+- All app assets (JS, CSS, images) are cached after first visit
+- Cards and data are stored in Firebase, which has its own offline persistence
+- Google Fonts are cached for consistent styling offline
+
+### PWA Benefits
+
+- **Fast Loading**: Cached assets load instantly
+- **Offline Access**: Core functionality works without internet
+- **Native-like Experience**: Runs in standalone mode without browser UI
+- **Auto-updates**: New versions are automatically downloaded and activated
+- **Responsive**: Adapts to any screen size and orientation
 
 ## Magic Click Feature
 
@@ -107,6 +141,8 @@ Example coordinates:
 - **Backend**: Firebase Firestore
 - **Barcode Scanning**: Quagga2
 - **Location Services**: Browser Geolocation API
+- **PWA**: vite-plugin-pwa with Workbox
+- **Service Worker**: Auto-updating with runtime caching
 - **Deployment**: Firebase Hosting
 
 ## Architecture
