@@ -25,6 +25,10 @@ const auth = getAuth(app);
 
 // Configure Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
+// Add custom parameters to prevent redirect issues
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // enablePersistence(db)
 //   .catch((err: any) => {
