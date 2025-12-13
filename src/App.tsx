@@ -1,12 +1,14 @@
 // src/App.tsx
 import { useState, useEffect } from 'react';
-import { collection, getDocs, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, setDoc, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext';
 import AddCardForm from './components/AddCardForm';
 import CardList from './components/CardList';
 import LoginPage from './components/LoginPage';
-import { type CardContent } from './types';
+import SharedUsersManager from './components/SharedUsersManager';
+import UserProfileManager from './components/UserProfileManager';
+import { type CardContent, type UserProfile } from './types';
 import { performMagicClick } from './utils/magicClick';
 import { 
   ThemeProvider, 
@@ -22,7 +24,7 @@ import {
   MenuItem,
   CircularProgress
 } from '@mui/material';
-import { Add, CreditCard, AccountCircle, Logout } from '@mui/icons-material';
+import { Add, CreditCard, AccountCircle, Logout, Share, Person } from '@mui/icons-material';
 
 function App() {
   const { user, loading, logout } = useAuth();
@@ -31,6 +33,8 @@ function App() {
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [logoHidden, setLogoHidden] = useState<boolean>(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [showSharedUsersManager, setShowSharedUsersManager] = useState<boolean>(false);
+  const [showUserProfile, setShowUserProfile] = useState<boolean>(false);
 
   // Create a Material-UI theme
   const theme = createTheme({
@@ -48,21 +52,83 @@ function App() {
     },
   });
 
-  // Function to fetch all cards
+  // Function to fetch all cards (own cards + shared cards)
   const fetchCards = async () => {
     if (!user) return; // Only fetch cards if user is authenticated
-    const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
-    const querySnapshot = await getDocs(collection(db, userCollection));
-    // Explicitly type the document snapshot for clarity
-    const cardsList = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-      id: doc.id,
-      store_name: doc.data().store_name,
-      code: doc.data().code,
-      barcode_type: doc.data().barcode_type,
-      shop_locations: doc.data().shop_locations || null,
-    }));
-    console.log(cardsList);
-    setCards(cardsList as CardContent[]); // Assert the final array as Card[]
+    
+    try {
+      // Fetch user's own cards
+      const userCollection = `users/${user.uid}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
+      const ownCardsSnapshot = await getDocs(collection(db, userCollection));
+      const ownCards = ownCardsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+        id: doc.id,
+        store_name: doc.data().store_name,
+        code: doc.data().code,
+        barcode_type: doc.data().barcode_type,
+        shop_locations: doc.data().shop_locations || null,
+      }));
+
+      const allCards = [...ownCards];
+      
+      // Fetch cards from users who are sharing with the current user
+      // Use the sharing_with_me collection for efficient lookup
+      try {
+        const sharingWithMeCollection = `users/${user.uid}/sharing_with_me`;
+        const sharingSnapshot = await getDocs(collection(db, sharingWithMeCollection));
+        
+        for (const sharingDoc of sharingSnapshot.docs) {
+          const sharingData = sharingDoc.data();
+          const otherUserId = sharingData.userId;
+          
+          console.log('Fetching shared cards from user:', otherUserId);
+          
+          // Fetch cards from this user who is sharing with us
+          const sharedCardsCollection = `users/${otherUserId}/${import.meta.env.VITE_FIRESTORE_COLLECTION}`;
+          const sharedCardsSnapshot = await getDocs(collection(db, sharedCardsCollection));
+          
+          const sharedCards = sharedCardsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+            id: `${otherUserId}_${doc.id}`, // Prefix with owner ID to make unique
+            store_name: doc.data().store_name,
+            code: doc.data().code,
+            barcode_type: doc.data().barcode_type,
+            shop_locations: doc.data().shop_locations || null,
+            ownerId: otherUserId,
+            ownerEmail: sharingData.email || 'Shared Card',
+          }));
+          
+          allCards.push(...sharedCards);
+        }
+      } catch (sharedError) {
+        console.error('Error fetching shared cards:', sharedError);
+        // Continue with own cards even if shared fetch fails
+      }
+      
+      console.log('Loaded cards:', allCards);
+      setCards(allCards as CardContent[]);
+    } catch (error) {
+      console.error('Error fetching cards:', error);
+    }
+  };
+
+  // Initialize user profile if it doesn't exist
+  const initializeUserProfile = async () => {
+    if (!user || !user.email) return;
+    
+    try {
+      const profileRef = doc(db, 'users', user.uid, 'profile', 'info');
+      const profileDoc = await getDoc(profileRef);
+      
+      if (!profileDoc.exists()) {
+        const newProfile: UserProfile = {
+          email: user.email,
+          createdAt: new Date(),
+        };
+        await setDoc(profileRef, newProfile);
+        console.log('User profile initialized');
+      }
+    } catch (error) {
+      console.error('Error initializing user profile:', error);
+    }
   };
 
   // Handle logo click - start spinning animation and select closest shop
@@ -83,6 +149,7 @@ function App() {
   useEffect(() => {
     if (user) {
       fetchCards();
+      initializeUserProfile();
     }
   }, [user]);
 
@@ -186,6 +253,20 @@ function App() {
                   horizontal: 'right',
                 }}
               >
+                <MenuItem onClick={() => {
+                  setShowUserProfile(true);
+                  handleUserMenuClose();
+                }}>
+                  <Person sx={{ mr: 1 }} />
+                  Profile
+                </MenuItem>
+                <MenuItem onClick={() => {
+                  setShowSharedUsersManager(true);
+                  handleUserMenuClose();
+                }}>
+                  <Share sx={{ mr: 1 }} />
+                  Share Cards
+                </MenuItem>
                 <MenuItem onClick={handleLogout}>
                   <Logout sx={{ mr: 1 }} />
                   Sign Out
@@ -243,6 +324,18 @@ function App() {
             <CardList cards={cards} onCardUpdated={fetchCards} />
           </Box>
         </Box>
+        
+        {/* Shared Users Manager Dialog */}
+        <SharedUsersManager 
+          open={showSharedUsersManager} 
+          onClose={() => setShowSharedUsersManager(false)} 
+        />
+        
+        {/* User Profile Manager Dialog */}
+        <UserProfileManager
+          open={showUserProfile}
+          onClose={() => setShowUserProfile(false)}
+        />
       </Box>
     </ThemeProvider>
   )

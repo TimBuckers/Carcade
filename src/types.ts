@@ -15,6 +15,22 @@ export interface ShopLocation {
   lat: number;
   lng: number;
 }
+
+// Define a type for shared user entries
+export interface SharedUser {
+  id: string;
+  email: string;
+  addedAt: Date;
+}
+
+// Define a type for user profile
+export interface UserProfile {
+  email: string;
+  username?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 // Define a type for our card object for better type safety
 export interface CardContent {
   id: string;
@@ -22,4 +38,6 @@ export interface CardContent {
   code: string;
   barcode_type?: BarcodeType;
   shop_locations: ShopLocation[] | null;
+  ownerEmail?: string; // Optional field to show who owns the card
+  ownerId?: string; // Optional field to identify the owner
 }

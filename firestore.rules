@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User's profile document - specific path
+    match /users/{userId}/profile/info {
+      // Users can read and write their own profile
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow reading any profile when searching by email (for sharing feature)
+      allow read: if request.auth != null;
+    }
+    
+    // Allow collectionGroup query on all profile subcollections
+    match /{path=**}/profile/{document} {
+      allow read: if request.auth != null;
+    }
+    
+    // User's customer cards
+    match /users/{userId}/customer_cards/{cardId} {
+      // Users can read their own cards
+      // OR cards from users who have shared with them
+      allow read: if request.auth != null && 
+                    (request.auth.uid == userId || 
+                     exists(/databases/$(database)/documents/users/$(request.auth.uid)/sharing_with_me/$(userId)));
+      
+      // Users can only write their own cards
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User's shared_with collection (who they share their cards with)
+    match /users/{userId}/shared_with/{sharedUserId} {
+      // Users can read and manage their own sharing list
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User's sharing_with_me collection (who is sharing cards with them)
+    match /users/{userId}/sharing_with_me/{sharerUserId} {
+      // Users can read their own sharing_with_me list
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // The sharer can write to this collection when they add/remove you
+      allow write: if request.auth != null && request.auth.uid == sharerUserId;
+    }
+  }
+}
