@@ -52,8 +52,8 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
     }
   };
 
-  const getBarcodeORQRImage = (code: string, barcodeType: keyof typeof BarcodeTypes): JSX.Element | null => {
-    if (barcodeType === "QRCODE") {
+  const getBarcodeORQRImage = (code: string, barcodeType: string): JSX.Element | null => {
+    if (barcodeType === BarcodeTypes.QRCODE) {
         // For QR codes, create a div container that QRCodeStyling can render into
         const qrCode = new QRCodeStyling({
             width: UI.QR_CODE_SIZE,
@@ -95,7 +95,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
 
     try {
         JsBarcode(canvas, code, {
-            format: BarcodeTypes[barcodeType],
+            format: BarcodeTypes[barcodeType as keyof typeof BarcodeTypes],
             displayValue: true,
             width: UI.BARCODE_WIDTH,
             height: UI.BARCODE_HEIGHT
