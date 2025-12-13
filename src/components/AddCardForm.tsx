@@ -32,7 +32,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     const { user } = useAuth();
     const [storeName, setStoreName] = useState<string>('');
     const [code, setCode] = useState<string>('');
-    const [barcodeType, setBarcodeType] = useState<keyof typeof BarcodeTypes>('EAN13');
+    const [barcodeType, setBarcodeType] = useState<keyof typeof BarcodeTypes>('ean_13');
     const [isScanning, setIsScanning] = useState<boolean>(false);
     const [shouldStartScanning, setShouldStartScanning] = useState<boolean>(false);
     const [scanSuccess, setScanSuccess] = useState<boolean>(false);

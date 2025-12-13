@@ -37,6 +37,86 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
 
+  // Generate a consistent color based on card code
+  const getCardColor = (code: string): { primary: string; secondary: string; text: string } => {
+    // Use store name as fallback if code is empty
+    const colorSource = code && code.trim() !== '' ? code : 'default';
+    
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < colorSource.length; i++) {
+      hash = colorSource.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Ensure hash is positive and not zero
+    hash = Math.abs(hash) || 1;
+    
+    // Color palette with 18 different colors
+    const colors = [
+      // Reds / Pinks
+      { hex: '#e0373e', name: 'Red' },
+      { hex: '#ee5355', name: 'Coral Red' },
+      { hex: '#FF69B4', name: 'Hot Pink' },
+      // Oranges / Yellows
+      { hex: '#f5b227', name: 'Golden Orange' },
+      { hex: '#f58c21', name: 'Orange' },
+      { hex: '#FFFF00', name: 'Yellow' },
+      // Yellow-Greens
+      { hex: '#69c761', name: 'Lime Green' },
+      { hex: '#FFD700', name: 'Gold' },
+      { hex: '#3CB371', name: 'Medium Sea Green' },
+      // Greens
+      { hex: '#0bb577', name: 'Green' },
+      { hex: '#40E0D0', name: 'Turquoise' },
+      { hex: '#99FFFF', name: 'Cyan' },
+      // Blues
+      { hex: '#03a3e3', name: 'Sky Blue' },
+      { hex: '#2e4ac1', name: 'Royal Blue' },
+      { hex: '#000080', name: 'Navy' },
+      // Purples
+      { hex: '#9850a4', name: 'Purple' },
+      { hex: '#EE82EE', name: 'Violet' },
+    ];
+    
+    // Use modulo to get a color index
+    const colorIndex = hash % colors.length;
+    const selectedColor = colors[colorIndex];
+    
+    // Helper function to convert hex to RGB
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 0, g: 0, b: 0 };
+    };
+    
+    // Helper function to create a lighter version of a color
+    const lightenColor = (hex: string, percent: number) => {
+      const rgb = hexToRgb(hex);
+      const r = Math.min(255, Math.floor(rgb.r + (255 - rgb.r) * percent));
+      const g = Math.min(255, Math.floor(rgb.g + (255 - rgb.g) * percent));
+      const b = Math.min(255, Math.floor(rgb.b + (255 - rgb.b) * percent));
+      return `rgb(${r}, ${g}, ${b})`;
+    };
+    
+    // Helper function to create a darker version of a color
+    const darkenColor = (hex: string, percent: number) => {
+      const rgb = hexToRgb(hex);
+      const r = Math.floor(rgb.r * (1 - percent));
+      const g = Math.floor(rgb.g * (1 - percent));
+      const b = Math.floor(rgb.b * (1 - percent));
+      return `rgb(${r}, ${g}, ${b})`;
+    };
+    
+    return {
+      primary: `linear-gradient(135deg, ${lightenColor(selectedColor.hex, 0.55)} 0%, ${lightenColor(selectedColor.hex, 0.35)} 100%)`,
+      secondary: selectedColor.hex,
+      text: darkenColor(selectedColor.hex, 0.3)
+    };
+  };
+
   // Handle card click - increment counter and open modal
   const handleCardClick = async (card: CardContent) => {
     setSelectedCard(card);
@@ -156,7 +236,9 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
             gap: 2 
           }}>
-            {cards.map(card => (
+            {cards.map(card => {
+              const cardColors = getCardColor(card.code);
+              return (
               <Card 
                 key={card.id}
                 data-card-id={card.id}
@@ -168,6 +250,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   flexDirection: 'column',
                   cursor: 'pointer',
                   position: 'relative',
+                  background: cardColors.primary,
                   '&:hover': {
                     boxShadow: 6,
                     transform: 'translateY(-2px) scale(1.02)',
@@ -181,14 +264,28 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
               >
                 <MuiCardContent sx={{ flexGrow: 1, p: 2, pt: 5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <CreditCard sx={{ mr: 1, color: 'primary.main' }} />
+                    <CreditCard sx={{ mr: 1 }} />
                     <Typography variant="h6" component="h3" noWrap>
                       {card.store_name}
                     </Typography>
                   </Box>
                   
-                  <Box sx={{ textAlign: 'center', mb: 2 }}>
-                    {card.barcode_type && getBarcodeORQRImage(card.code, card.barcode_type)}
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    mb: 2,
+                    display: 'inline-flex',
+                    width: '100%',
+                    justifyContent: 'center'
+                  }}>
+                    <Box sx={{
+                      backgroundColor: '#fff',
+                      border: '2px solid #fff',
+                      borderRadius: 1,
+                      padding: 1,
+                      display: 'inline-block'
+                    }}>
+                      {card.barcode_type && getBarcodeORQRImage(card.code, card.barcode_type)}
+                    </Box>
                   </Box>
                   
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -198,13 +295,13 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                     <Chip 
                       label={card.barcode_type} 
                       size="small" 
-                      variant="outlined" 
-                      color="primary"
+                      variant="outlined"
                     />
                   </Box>
                 </MuiCardContent>
               </Card>
-            ))}
+              );
+            })}
           </Box>
         )}
       </Box>
@@ -243,7 +340,9 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
             }
           }}
         >
-          {selectedCard && (
+          {selectedCard && (() => {
+            const modalColors = getCardColor(selectedCard.code);
+            return (
             <Card 
               elevation={12}
               sx={{
@@ -251,7 +350,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                 maxWidth: { xs: '90vw', sm: '90vw', md: 600 },
                 minWidth: { xs: '280px', sm: '350px', md: '400px' },
                 position: 'relative',
-                background: 'linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%)',
+                background: modalColors.primary,
               }}
             >
               <IconButton
@@ -328,28 +427,33 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                 <Box sx={{ 
                   textAlign: 'center', 
                   mb: 3,
-                  p: 2,
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                  borderRadius: 2,
-                  border: '1px dashed #ccc',
-                  overflow: 'hidden',
-                  maxWidth: '100%'
+                  display: 'flex',
+                  justifyContent: 'center'
                 }}>
-                  <Box sx={{ 
-                    maxWidth: '100%',
-                    maxHeight: '200px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    '& img': {
+                  <Box sx={{
+                    backgroundColor: '#fff',
+                    border: '3px solid #fff',
+                    borderRadius: 1,
+                    padding: 2,
+                    display: 'inline-block',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                    <Box sx={{ 
                       maxWidth: '100%',
                       maxHeight: '200px',
-                      height: 'auto',
-                      width: 'auto',
-                      objectFit: 'contain'
-                    }
-                  }}>
-                    {selectedCard.barcode_type && getBarcodeORQRImage(selectedCard.code, selectedCard.barcode_type)}
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      '& img': {
+                        maxWidth: '100%',
+                        maxHeight: '200px',
+                        height: 'auto',
+                        width: 'auto',
+                        objectFit: 'contain'
+                      }
+                    }}>
+                      {selectedCard.barcode_type && getBarcodeORQRImage(selectedCard.code, selectedCard.barcode_type)}
+                    </Box>
                   </Box>
                 </Box>
                 
@@ -360,9 +464,10 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   <Chip 
                     label={selectedCard.barcode_type} 
                     size="medium" 
-                    variant="filled" 
-                    color="primary"
-                    sx={{ fontWeight: 'bold' }}
+                    variant="outlined" 
+                    sx={{ 
+                      fontWeight: 'bold'
+                    }}
                   />
                 </Box>
                 
@@ -381,7 +486,8 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                 </Box>
               </MuiCardContent>
             </Card>
-          )}
+            );
+          })()}
         </Box>
       </Modal>
 
