@@ -40,4 +40,5 @@ export interface CardContent {
   shop_locations: ShopLocation[] | null;
   ownerEmail?: string; // Optional field to show who owns the card
   ownerId?: string; // Optional field to identify the owner
+  openCount?: number; // Number of times the card has been opened
 }

@@ -3,7 +3,7 @@
  * Separates business logic from UI components
  */
 
-import { collection, getDocs, addDoc, doc, updateDoc, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, increment, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { type CardContent, type BarcodeType } from '../types';
 import { getCardCollectionPath, getSharingWithMePath } from '../utils/firebasePaths';
@@ -25,6 +25,7 @@ export const fetchUserCards = async (userId: string): Promise<CardContent[]> => 
       code: doc.data().code,
       barcode_type: doc.data().barcode_type,
       shop_locations: doc.data().shop_locations || null,
+      openCount: doc.data().openCount || 0,
     }));
   } catch (error) {
     logger.error('Error fetching user cards:', error);
@@ -61,6 +62,7 @@ export const fetchSharedCards = async (userId: string): Promise<CardContent[]> =
         shop_locations: doc.data().shop_locations || null,
         ownerId: otherUserId,
         ownerEmail: sharingData.email || 'Shared Card',
+        openCount: doc.data().openCount || 0,
       }));
       
       sharedCards.push(...cards);
@@ -152,5 +154,30 @@ export const updateCardLocations = async (
   } catch (error) {
     logger.error('Error updating card locations:', error);
     throw error;
+  }
+};
+
+/**
+ * Increment the open count for a card
+ * @param userId - The user's Firebase UID (the owner of the card)
+ * @param cardId - The card's ID (without the userId prefix for shared cards)
+ */
+export const incrementCardOpenCount = async (
+  userId: string,
+  cardId: string
+): Promise<void> => {
+  try {
+    const collectionPath = getCardCollectionPath(userId);
+    const cardRef = doc(db, collectionPath, cardId);
+    
+    // Use Firestore's increment() to atomically increase the counter
+    await updateDoc(cardRef, {
+      openCount: increment(1),
+    });
+    
+    logger.debug('Card open count incremented:', cardId);
+  } catch (error) {
+    logger.error('Error incrementing card open count:', error);
+    // Don't throw - we don't want to block the UI if counter update fails
   }
 };

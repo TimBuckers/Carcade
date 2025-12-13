@@ -8,6 +8,7 @@ import { UI } from '../constants';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { logger } from '../utils/logger';
+import { incrementCardOpenCount } from '../services/cardService';
 import {
   Card,
   CardContent as MuiCardContent,
@@ -35,6 +36,21 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
+
+  // Handle card click - increment counter and open modal
+  const handleCardClick = async (card: CardContent) => {
+    setSelectedCard(card);
+    
+    // Increment open count in database
+    if (user) {
+      // For shared cards, the ID is in the format "ownerId_cardId"
+      // We need to extract the real card ID and owner ID
+      const ownerId = card.ownerId || user.uid;
+      const cardId = card.ownerId ? card.id.split('_')[1] : card.id;
+      
+      await incrementCardOpenCount(ownerId, cardId);
+    }
+  };
 
   const getBarcodeORQRImage = (code: string, barcodeType: keyof typeof BarcodeTypes): JSX.Element | null => {
     if (barcodeType === "QRCODE") {
@@ -145,7 +161,7 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                 key={card.id}
                 data-card-id={card.id}
                 elevation={3}
-                onClick={() => setSelectedCard(card)}
+                onClick={() => handleCardClick(card)}
                 sx={{ 
                   height: '100%',
                   display: 'flex',
@@ -349,6 +365,20 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                     color="primary"
                     sx={{ fontWeight: 'bold' }}
                   />
+                </Box>
+                
+                {/* Open count display */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  mt: 2,
+                  pt: 2,
+                  borderTop: '1px solid rgba(0, 0, 0, 0.1)'
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    Opened {selectedCard.openCount || 0} {(selectedCard.openCount || 0) === 1 ? 'time' : 'times'}
+                  </Typography>
                 </Box>
               </MuiCardContent>
             </Card>

@@ -62,7 +62,9 @@ function App() {
     
     try {
       const allCards = await fetchAllCards(user.uid);
-      setCards(allCards);
+      // Sort cards by openCount in descending order (most opened first)
+      const sortedCards = allCards.sort((a, b) => (b.openCount || 0) - (a.openCount || 0));
+      setCards(sortedCards);
     } catch (error) {
       handleError(error, 'Error fetching cards');
     }

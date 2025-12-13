@@ -43,11 +43,10 @@ const findNearbyShopsFromCards = (userLocation: Location, cards: CardContent[]):
   return shopsWithDistances.sort((a, b) => a.distance - b.distance);
 };
 
-
-
 /**
  * Selects a random card from the provided cards array and triggers a click event
  * on the corresponding DOM element to open the card modal.
+ * The counter will be incremented by the click handler in CardList.
  * 
  * @param cards - Array of cards to select from
  * @returns The randomly selected card, or null if no cards available
@@ -64,6 +63,7 @@ export const selectRandomCard = (cards: CardContent[]): CardContent | null => {
   
   // Trigger card selection in CardList component
   // Find the card element by its data-card-id attribute and simulate a click
+  // The click will trigger handleCardClick which increments the counter
   const cardElement = document.querySelector(`[data-card-id="${randomCard.id}"]`) as HTMLElement;
   if (cardElement) {
     cardElement.click();
@@ -74,6 +74,7 @@ export const selectRandomCard = (cards: CardContent[]): CardContent | null => {
 
 /**
  * Selects the card for the closest shop based on user's location and hardcoded shop locations
+ * The counter will be incremented by the click handler in CardList.
  * @param cards - Array of cards to search through
  * @returns Promise<CardContent | null> - The card for the closest shop, or null if none found
  */
@@ -101,6 +102,7 @@ export const selectClosestShop = async (cards: CardContent[]): Promise<CardConte
         logger.debug(`Found closest shop: ${closestShop.card.store_name} (${closestShop.distance.toFixed(2)}km away)`);
         
         // Trigger card selection in CardList component
+        // The click will trigger handleCardClick which increments the counter
         const cardElement = document.querySelector(`[data-card-id="${closestShop.card.id}"]`) as HTMLElement;
         if (cardElement) {
             cardElement.click();
@@ -120,6 +122,7 @@ export const selectClosestShop = async (cards: CardContent[]): Promise<CardConte
 /**
  * Magic click functionality that combines the logo animation timing
  * with closest shop selection based on location.
+ * The counter will be incremented by the click handler in CardList.
  * 
  * @param cards - Array of cards to select from
  * @param setIsSpinning - Function to set spinning state
