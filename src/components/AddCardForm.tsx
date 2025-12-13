@@ -77,17 +77,18 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                             ]
                         },
                         locate: true
-                    }, (err: any) => {
+                    }, (err: unknown) => {
                         if (err) {
-                            logger.error('Error initializing Quagga:', err);
+                            const error = err as Error;
+                            logger.error('Error initializing Quagga:', error);
                             setIsScanning(false);
                             setShouldStartScanning(false);
-                            alert(ERROR_MESSAGES.SCANNER_INIT_FAILED + ': ' + err.message);
+                            alert(ERROR_MESSAGES.SCANNER_INIT_FAILED + ': ' + error.message);
                             return;
                         }
 
                         // Set up barcode detection callback
-                        Quagga.onDetected((result: any) => {
+                        Quagga.onDetected((result: { codeResult: { code: string; format: string } }) => {
                             setCode(result.codeResult.code);
 
                             // Map Quagga's format names to our BarcodeType keys
@@ -130,7 +131,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
                     setIsScanning(false);
                     setShouldStartScanning(false);
 
-                    const err = error as any;
+                    const err = error as Error & { name: string };
                     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                         alert(ERROR_MESSAGES.SCANNER_PERMISSION_DENIED);
                     } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
@@ -149,7 +150,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
     const stopScanning = () => {
         try {
             Quagga.stop();
-            Quagga.offDetected((_result: any) => { });
+            Quagga.offDetected(() => { });
         } catch (error) {
             logger.error('Error stopping scanner:', error);
         }
@@ -184,7 +185,7 @@ function AddCardForm({ onCardAdded, onClose }: AddCardFormProps) {
         return () => {
             try {
                 Quagga.stop();
-                Quagga.offDetected((_result: any) => { });
+                Quagga.offDetected(() => { });
             } catch (error) {
                 logger.debug('Cleanup error:', error);
             }

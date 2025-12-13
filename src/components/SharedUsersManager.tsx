@@ -151,6 +151,7 @@ function SharedUsersManager({ open, onClose }: SharedUsersManagerProps) {
       setError('');
       setSuccess('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, user]);
 
   return (

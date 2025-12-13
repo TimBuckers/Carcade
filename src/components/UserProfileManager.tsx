@@ -106,6 +106,7 @@ function UserProfileManager({ open, onClose }: UserProfileManagerProps) {
       setError('');
       setSuccess('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, user]);
 
   return (

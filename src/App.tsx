@@ -109,6 +109,7 @@ function App() {
       fetchCards();
       initializeUserProfile();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Show loading spinner while checking authentication
