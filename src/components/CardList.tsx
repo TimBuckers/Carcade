@@ -250,8 +250,15 @@ function CardList({ cards, onCardUpdated }: CardListProps) {
                   flexDirection: 'column',
                   cursor: 'pointer',
                   position: 'relative',
-                  border: `4px solid ${cardColors.secondary}`,
-                  borderRadius: '10px',
+                  borderLeft: `8px solid ${cardColors.secondary}`,
+                  borderRadius: '8px', // Less round
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  borderTopRightRadius: '8px',
+                  borderBottomRightRadius: '8px',
+                  boxShadow: 3,
+                  background: '#fff',
+                  mb: 3,
                   '&:hover': {
                     boxShadow: 6,
                     transform: 'translateY(-2px) scale(1.02)',

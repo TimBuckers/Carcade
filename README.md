@@ -4,12 +4,16 @@ CardCade is a React-based customer card management application with barcode scan
 
 ## Features
 
-- 📱 **Barcode Scanning**: Scan customer cards using your device's camera
-- 🎰 **Magic Click**: Click the logo to automatically select the closest shop based on your location
-- 🗺️ **Location-Based Selection**: Uses hardcoded shop coordinates to find nearby shops and match them with your cards
-- 🔥 **Firebase Integration**: Cloud storage for all your customer cards
+- � **Authentication**: Sign in securely with Google
+- 📱 **Barcode & QR Scanning**: Scan loyalty cards using your device's camera (EAN-13, Code128, Code39, QR)
+- 🎰 **Magic Click**: Click the logo to automatically select the card for the closest shop based on your GPS location
+- 🗺️ **Location-Based Selection**: Attach GPS coordinates to cards so the closest shop is always surfaced first
+- 🤝 **Card Sharing**: Share all your cards with other users by email — bidirectional access, no Cloud Functions required
+- 👤 **User Profiles**: Set a custom username visible across the app
+- 📊 **Smart Sorting**: Cards are sorted by open count so your most-used cards appear first
+- 🔥 **Firebase Integration**: Cloud storage with per-user Firestore collections
 - 📱 **Responsive Design**: Works on mobile and desktop devices
-- 🎨 **Material Design**: Clean, modern UI with Material-UI components
+- 🎨 **Material Design**: Clean, modern UI with Material-UI v7 components
 - 💾 **Progressive Web App (PWA)**: Install on Android and iOS devices, works offline with service worker caching
 
 ## PWA Features
@@ -106,43 +110,44 @@ VITE_APP_NAME=CardCade
 
 ## Usage
 
-1. **Add Cards**: Click "Add Card" to scan or manually enter customer card information
-   - **Shop Locations**: Expand the "Shop Locations" section to add GPS coordinates for shop locations
-   - **Multiple Locations**: Add multiple locations for chains with multiple stores
-   - **Coordinates**: Find coordinates using Google Maps by clicking on a location
+1. **Sign In**: Log in with your Google account on first launch.
 
-2. **Magic Click**: Click the CardCade logo to find the closest shop and display its card
+2. **Add Cards**: Click **+ Card** in the toolbar to open the add-card form.
+   - Enter the store name and barcode/QR value manually, or tap **Scan** to use your camera.
+   - Select the barcode type (EAN-13, Code128, Code39, or QR Code).
+   - Click **Add Card** to save to Firestore.
 
-3. **View Cards**: Browse all your stored cards in the responsive grid layout
+3. **Attach Shop Locations**: Open any card, then click the **location pin icon** to open the Location Dialog.
+   - Tap **Use Current Location** to capture your GPS position as a shop coordinate.
+   - Add multiple coordinates for chain stores with multiple branches.
+   - Remove all coordinates with **Clear All Locations**.
 
-4. **Card Details**: Click any card to view its full details and barcode
+4. **Magic Click**: Click the CardCade logo on the main screen.
+   - The app requests your GPS position, calculates distances to all stored shop coordinates, and opens the card for the closest match.
+   - Falls back to a random card if no shop coordinates exist.
 
-## Adding Shop Locations
+5. **View Cards**: Cards are displayed in a responsive grid sorted by open count (most-used first). Click any card to view its barcode/QR code in full.
 
-When adding a new card, you can specify one or more shop locations:
+6. **Share Cards**: Open the user menu (top-right avatar) → **Share Cards**.
+   - Enter the email address of another CardCade user.
+   - Their email must match an existing account profile.
+   - All your cards will be visible to them immediately; shared cards show your email as the owner.
+   - Remove a user to revoke access instantly.
 
-1. Expand the "Shop Locations" accordion in the add card form
-2. Enter latitude and longitude coordinates for each shop location
-3. Add multiple locations for chains (e.g., different McDonald's locations)
-4. Use Google Maps to find coordinates:
-   - Search for the shop on Google Maps
-   - Click on the location to get coordinates
-   - Copy the coordinates to the form
-
-Example coordinates:
-- **New York City**: 40.7128, -74.0060
-- **Los Angeles**: 34.0522, -118.2437
-- **London**: 51.5074, -0.1278
+7. **User Profile**: Open the user menu → **Profile** to set a custom username.
 
 ## Technical Stack
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **UI Library**: Material-UI (MUI)
-- **Backend**: Firebase Firestore
-- **Barcode Scanning**: Quagga2
+- **Frontend**: React 19 + TypeScript + Vite 7
+- **UI Library**: Material-UI (MUI) v7
+- **Backend**: Firebase 12 (Firestore + Auth)
+- **Authentication**: Firebase Google Sign-In
+- **Barcode Scanning**: Quagga2 (Code128, EAN-13, Code39)
+- **Barcode Rendering**: JsBarcode + qr-code-styling (QR codes)
 - **Location Services**: Browser Geolocation API
 - **PWA**: vite-plugin-pwa with Workbox
 - **Service Worker**: Auto-updating with runtime caching
+- **Testing**: Vitest
 - **Deployment**: Firebase Hosting
 
 ## Architecture
@@ -150,32 +155,75 @@ Example coordinates:
 ```
 src/
 ├── components/
-│   ├── AddCardForm.tsx    # Card input form with barcode scanning and location management
-│   └── CardList.tsx       # Card display grid with modal
+│   ├── AddCardForm.tsx        # Card input form with live barcode scanning
+│   ├── CardList.tsx           # Card display grid with modal, barcode/QR rendering, and location editing
+│   ├── LoginPage.tsx          # Google Sign-In landing page
+│   ├── LocationDialog.tsx     # Dialog for attaching/removing GPS shop coordinates from a card
+│   ├── SharedUsersManager.tsx # Manage users you share all your cards with
+│   └── UserProfileManager.tsx # Edit display username
+├── contexts/
+│   └── AuthContext.tsx        # Firebase Auth context (Google provider)
+├── services/
+│   └── cardService.ts         # Firestore CRUD: fetch own cards, fetch shared cards, add, update locations, increment openCount
 ├── utils/
-│   └── magicClick.ts      # Location-based shop selection logic
-├── types.ts               # TypeScript type definitions including ShopLocation
-├── firebase.ts            # Firebase configuration
-└── App.tsx               # Main application component
+│   ├── magicClick.ts          # Magic-click: GPS → closest shop → open card modal
+│   ├── geolocation.ts         # getCurrentLocation(), calculateDistance(), duplicate detection
+│   ├── firebasePaths.ts       # Centralized Firestore path helpers
+│   ├── errorHandler.ts        # Error extraction, validation helpers (email, username)
+│   └── logger.ts              # Dev/prod logging wrapper
+├── constants/
+│   └── index.ts               # Animation, geolocation, UI, validation, scanner constants
+├── types.ts                   # TypeScript interfaces: CardContent, ShopLocation, SharedUser, UserProfile
+├── firebase.ts                # Firebase app + Firestore initialization
+└── App.tsx                    # Root: auth gate, AppBar, card fetching, magic-click handler
 ```
 
 ## Data Structure
-
-Each customer card now includes shop locations:
 
 ```typescript
 interface CardContent {
   id: string;
   store_name: string;
   code: string;
-  barcode_type: string;
-  shop_locations: ShopLocation[];
+  barcode_type?: BarcodeType;       // 'EAN13' | 'EAN8' | 'CODE128' | 'CODE39' | 'QRCODE'
+  shop_locations: ShopLocation[] | null;
+  openCount?: number;               // Atomic counter incremented each time the card is opened
+  ownerEmail?: string;              // Set on shared cards — shows who owns them
+  ownerId?: string;                 // UID of the owner; present on shared cards
 }
 
 interface ShopLocation {
   lat: number;
   lng: number;
 }
+
+interface SharedUser {
+  id: string;     // Firebase UID of the user being shared with
+  email: string;
+  addedAt: Date;
+}
+
+interface UserProfile {
+  email: string;
+  username?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+### Firestore Layout
+
+```
+users/
+  {userId}/
+    profile/
+      info: { email, username?, createdAt, updatedAt }
+    {VITE_FIRESTORE_COLLECTION}/        # e.g. customer_cards
+      {cardId}: { store_name, code, barcode_type, shop_locations, openCount }
+    shared_with/
+      {targetUserId}: { email, userId, addedAt }  # Who I share with
+    sharing_with_me/
+      {sharerUserId}: { email, userId, addedAt }  # Who shares with me (reverse index)
 ```
 
 ## Contributing

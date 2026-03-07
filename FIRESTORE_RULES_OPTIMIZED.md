@@ -20,6 +20,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
     
+    // Allow collectionGroup query on all profile subcollections
+    match /{path=**}/profile/{document} {
+      allow read: if request.auth != null;
+    }
+    
     // User's customer cards
     match /users/{userId}/customer_cards/{cardId} {
       // Users can read their own cards
