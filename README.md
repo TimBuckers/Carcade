@@ -11,7 +11,8 @@ CardCade is a React-based customer card management application with barcode scan
 - 🤝 **Card Sharing**: Share all your cards with other users by email — bidirectional access, no Cloud Functions required
 - 👤 **User Profiles**: Set a custom username visible across the app
 - 📊 **Smart Sorting**: Cards are sorted by open count so your most-used cards appear first
-- 🔥 **Firebase Integration**: Cloud storage with per-user Firestore collections
+- � **Quick-Access Shortcut**: Deep-link any card to your home screen — tapping its icon opens that card instantly
+- �🔥 **Firebase Integration**: Cloud storage with per-user Firestore collections
 - 📱 **Responsive Design**: Works on mobile and desktop devices
 - 🎨 **Material Design**: Clean, modern UI with Material-UI v7 components
 - 💾 **Progressive Web App (PWA)**: Install on Android and iOS devices, works offline with service worker caching
@@ -57,6 +58,26 @@ The "Magic Click" feature uses your device's GPS location to:
 3. Find the closest shop location
 4. Automatically select and display the card for the closest shop
 5. Fall back to random selection if no shop locations are available
+
+## Quick-Access Shortcut Feature
+
+Every card can be pinned to your device's home screen as a one-tap shortcut:
+
+1. Open any card from the grid
+2. Tap **Add shortcut** at the bottom of the card detail
+   - **Mobile**: the native Web Share sheet appears — tap *Add to Home Screen* (Android) or *Add Bookmark* (iOS) and set the URL as a home-screen shortcut
+   - **Desktop**: the shortcut link is copied to your clipboard; you can add it as a browser bookmark or a desktop shortcut
+3. Launch the app via that shortcut — CardCade reads the `?card=<id>` URL parameter and automatically opens the correct card modal
+
+### How it works
+
+- Deep-link format: `https://<your-domain>/?card=<cardId>`
+- Works for both your own cards and shared cards
+- Implemented in `src/utils/cardShortcut.ts`:
+  - `buildShortcutUrl(cardId)` — constructs the URL
+  - `getCardIdFromUrl()` — reads the param on launch
+  - `shareOrCopyShortcut()` — calls `navigator.share()` on mobile, falls back to `clipboard.writeText()` on desktop
+- `CardList` auto-opens the target card via a `useEffect` that fires once cards are loaded
 
 ## Setup and Installation
 
@@ -136,6 +157,11 @@ VITE_APP_NAME=CardCade
 
 7. **User Profile**: Open the user menu → **Profile** to set a custom username.
 
+8. **Quick-Access Shortcut**: Open any card and tap **Add shortcut** at the bottom of the detail view.
+   - On mobile (Android/iOS), the native share sheet opens — tap "Add to Home Screen" to pin that card as a shortcut.
+   - On desktop, the deep-link URL is copied to your clipboard.
+   - Launching the app from that shortcut URL automatically opens the card immediately (no navigation needed).
+
 ## Technical Stack
 
 - **Frontend**: React 19 + TypeScript + Vite 7
@@ -167,6 +193,7 @@ src/
 │   └── cardService.ts         # Firestore CRUD: fetch own cards, fetch shared cards, add, update locations, increment openCount
 ├── utils/
 │   ├── magicClick.ts          # Magic-click: GPS → closest shop → open card modal
+│   ├── cardShortcut.ts        # Deep-link helpers: build /?card=id URL, read on launch, share or copy
 │   ├── geolocation.ts         # getCurrentLocation(), calculateDistance(), duplicate detection
 │   ├── firebasePaths.ts       # Centralized Firestore path helpers
 │   ├── errorHandler.ts        # Error extraction, validation helpers (email, username)

@@ -63,6 +63,7 @@ export const fetchSharedCards = async (userId: string): Promise<CardContent[]> =
         ownerId: otherUserId,
         ownerEmail: sharingData.email || 'Shared Card',
         openCount: doc.data().openCount || 0,
+        level: doc.data().level ?? 0,
       }));
       
       sharedCards.push(...cards);
@@ -153,6 +154,28 @@ export const updateCardLocations = async (
     logger.debug('Card locations updated:', cardId);
   } catch (error) {
     logger.error('Error updating card locations:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update the level for a card
+ * @param userId - The owner's Firebase UID
+ * @param cardId - The card's Firestore document ID
+ * @param level - New level value
+ */
+export const updateCardLevel = async (
+  userId: string,
+  cardId: string,
+  level: number
+): Promise<void> => {
+  try {
+    const collectionPath = getCardCollectionPath(userId);
+    const cardRef = doc(db, collectionPath, cardId);
+    await updateDoc(cardRef, { level });
+    logger.debug('Card level updated:', cardId, level);
+  } catch (error) {
+    logger.error('Error updating card level:', error);
     throw error;
   }
 };

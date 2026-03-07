@@ -10,6 +10,7 @@ import SharedUsersManager from './components/SharedUsersManager';
 import UserProfileManager from './components/UserProfileManager';
 import { type CardContent, type UserProfile } from './types';
 import { performMagicClick } from './utils/magicClick';
+import { getCardIdFromUrl } from './utils/cardShortcut';
 import { getProfilePath } from './utils/firebasePaths';
 import { fetchAllCards } from './services/cardService';
 import { logger } from './utils/logger';
@@ -39,6 +40,8 @@ function App() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [showSharedUsersManager, setShowSharedUsersManager] = useState<boolean>(false);
   const [showUserProfile, setShowUserProfile] = useState<boolean>(false);
+  // Card ID from ?card= URL param — used to auto-open a card on launch
+  const [targetCardId] = useState<string | null>(() => getCardIdFromUrl());
 
   // Create a Material-UI theme
   const theme = createTheme({
@@ -292,7 +295,7 @@ function App() {
               </Box>
             )}
             {showAddCardForm && <AddCardForm onCardAdded={fetchCards} onClose={() => setShowAddCardForm(false)} />}
-            <CardList cards={cards} onCardUpdated={fetchCards} />
+            <CardList cards={cards} onCardUpdated={fetchCards} targetCardId={targetCardId} />
           </Box>
         </Box>
         
