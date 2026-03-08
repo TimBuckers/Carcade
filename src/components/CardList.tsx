@@ -468,8 +468,8 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
         </Box>
       )}
 
-      {/* Game Screen — fullscreen animated card entry */}
-      {selectedCard && (
+      {/* Game Screen — only in game mode (cards flipped) */}
+      {selectedCard && cardsFlipped && (
         <GameScreen
           card={selectedCard}
           cardColors={getCardColor(selectedCard.code)}
@@ -479,9 +479,9 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
         />
       )}
 
-      {/* Enlarged Card Modal — kept for future use, hidden */}
+      {/* Enlarged Card Modal — normal mode (cards not flipped) */}
       <Modal
-        open={false}
+        open={!!selectedCard && !cardsFlipped}
         onClose={() => setSelectedCard(null)}
         sx={{
           display: 'flex',
