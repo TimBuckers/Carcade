@@ -24,10 +24,14 @@ const dbg = (...args: unknown[]) => { if (DBG) console.log('[Game]', ...args); }
 // ─── Game constants ────────────────────────────────────────────────────────────
 const PW = 72;          // player width  (card-shaped rectangle)
 const PH = 38;          // player height
-const GRAVITY   = 0.52;
-const JUMP_VEL  = -13.5;
-const PSPEED    = 5.5;
-const GROUND_OFF = 64;  // px from canvas bottom
+const GRAVITY        = 0.52;
+const JUMP_VEL       = -13.5;
+const DBL_JUMP_VEL   = -19.5;   // stronger boost for double jump
+const PSPEED         = 5.5;
+const GROUND_OFF     = 64;  // px from canvas bottom
+const PU_W = 42;             // power-up rect width
+const PU_H = 28;             // power-up rect height
+const PU_SPAWN_INT   = 310;  // frames between power-up spawns
 
 const CIRCLE_DEFS = [
   { value: 1,  r: 16, color: '#2ecc71', glowColor: '#27ae6099' },
@@ -47,6 +51,14 @@ interface GamePlayer {
   health: number;
   hitFlash: number;
   jumpPressed: boolean;
+  doubleJumps: number;
+}
+
+interface PowerUp {
+  id: number;
+  x: number; y: number;
+  velX: number;
+  bob: number; // oscillation phase
 }
 
 interface GameBall {
@@ -62,14 +74,18 @@ type Phase = 'intro' | 'ready' | 'playing' | 'dead';
 function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) {
   const level = card.level ?? 0;
 
-  const [phase, setPhase]                 = useState<Phase>('intro');
-  const [displayHealth, setDisplayHealth] = useState(100);
-  const [deathCount, setDeathCount]       = useState(0);
+  const [phase, setPhase]                     = useState<Phase>('intro');
+  const [displayHealth, setDisplayHealth]     = useState(100);
+  const [displayDoubleJumps, setDisplayDoubleJumps] = useState(0);
+  const [deathCount, setDeathCount]           = useState(0);
 
   const canvasRef       = useRef<HTMLCanvasElement>(null);
   const phaseRef        = useRef<Phase>('intro');
-  const playerRef       = useRef<GamePlayer>({ x: 0, y: 0, velX: 0, velY: 0, onGround: false, health: 100, hitFlash: 0, jumpPressed: false });
+  const playerRef       = useRef<GamePlayer>({ x: 0, y: 0, velX: 0, velY: 0, onGround: false, health: 100, hitFlash: 0, jumpPressed: false, doubleJumps: 0 });
   const ballsRef        = useRef<GameBall[]>([]);
+  const powerUpsRef     = useRef<PowerUp[]>([]);
+  const powerUpIdRef    = useRef(0);
+  const powerUpTimerRef = useRef(0);
   const keysRef         = useRef<Set<string>>(new Set());
   const rafRef          = useRef<number>(0);
   const spawnTimerRef   = useRef(0);
@@ -156,13 +172,17 @@ function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) 
       p.x = 90; p.y = gndY() - PH;
       p.velX = 0; p.velY = 0; p.onGround = true;
       p.health = 100; p.hitFlash = 0; p.jumpPressed = false;
+      p.doubleJumps = 0;
       prevHealthRef.current = 100;
       setDisplayHealth(100);
+      setDisplayDoubleJumps(0);
     };
 
     resetPlayer();
-    ballsRef.current  = [];
+    ballsRef.current      = [];
+    powerUpsRef.current   = [];
     spawnTimerRef.current = 0;
+    powerUpTimerRef.current = 0;
 
     const spawnInterval = () => Math.max(48, 108 - level * 8);
 
@@ -236,7 +256,15 @@ function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) 
       if (keys.has('ArrowLeft'))  p.velX = -PSPEED;
       if (keys.has('ArrowRight')) p.velX =  PSPEED;
       const wantsJump = keys.has('ArrowUp') || keys.has('Space');
-      if (wantsJump && !p.jumpPressed && p.onGround) { p.velY = JUMP_VEL; p.onGround = false; }
+      if (wantsJump && !p.jumpPressed) {
+        if (p.onGround) {
+          p.velY = JUMP_VEL; p.onGround = false;
+        } else if (p.doubleJumps > 0) {
+          p.velY = DBL_JUMP_VEL;
+          p.doubleJumps--;
+          setDisplayDoubleJumps(p.doubleJumps);
+        }
+      }
       p.jumpPressed = wantsJump;
 
       // ── physics ────────────────────────────────────────────────────────────
@@ -247,9 +275,27 @@ function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) 
       p.x = Math.max(0, Math.min(W - PW, p.x));
       if (p.hitFlash > 0) p.hitFlash -= dt;
 
-      // ── spawn ──────────────────────────────────────────────────────────────
+      // ── spawn balls ────────────────────────────────────────────────────────
       spawnTimerRef.current += dt;
       if (spawnTimerRef.current >= spawnInterval()) { spawnTimerRef.current = 0; spawnBall(); }
+
+      // ── spawn power-ups ────────────────────────────────────────────────────
+      powerUpTimerRef.current += dt;
+      if (powerUpTimerRef.current >= PU_SPAWN_INT) {
+        powerUpTimerRef.current = 0;
+        // 80 % near ground (walkable), 20 % anywhere
+        const nearGround = Math.random() < 0.8;
+        const puY = nearGround
+          ? gY - PU_H - Math.random() * 28          // just above floor
+          : 30 + Math.random() * Math.max(0, gY - PU_H - 60); // full range
+        powerUpsRef.current.push({
+          id: powerUpIdRef.current++,
+          x: W + PU_W + 10,
+          y: puY,
+          velX: -(2.2 + level * 0.2 + Math.random() * 1.2),
+          bob: Math.random() * Math.PI * 2,
+        });
+      }
 
       // ── update balls ───────────────────────────────────────────────────────
       ballsRef.current = ballsRef.current.filter(b => {
@@ -287,6 +333,22 @@ function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) 
           return false;
         }
         return b.x + b.r > -60;
+      });
+
+      // ── update power-ups ───────────────────────────────────────────────────
+      powerUpsRef.current = powerUpsRef.current.filter(pu => {
+        pu.x += pu.velX * dt;
+        pu.bob += 0.06 * dt;
+
+        // AABB hit test with player
+        const hit = p.x < pu.x + PU_W && p.x + PW > pu.x &&
+                    p.y < pu.y + PU_H && p.y + PH > pu.y;
+        if (hit) {
+          p.doubleJumps++;
+          setDisplayDoubleJumps(p.doubleJumps);
+          return false; // consume
+        }
+        return pu.x + PU_W > -40;
       });
 
       // ─────────────────────────────── DRAW ────────────────────────────────
@@ -332,6 +394,28 @@ function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) 
         ctx.font = `bold ${Math.round(b.r * 0.74)}px system-ui,sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(b.value), b.x, b.y);
+        ctx.restore();
+      }
+
+      // ── draw power-ups ───────────────────────────────────────────────────────
+      for (const pu of powerUpsRef.current) {
+        const bobOffset = Math.sin(pu.bob) * 5;
+        const rx = pu.x, ry = pu.y + bobOffset;
+        ctx.save();
+        // glow
+        ctx.shadowColor = '#00e5ffcc'; ctx.shadowBlur = 18;
+        // body fill
+        ctx.fillStyle = '#003344cc';
+        rr(rx, ry, PU_W, PU_H, 6); ctx.fill();
+        // border
+        ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2.5;
+        rr(rx, ry, PU_W, PU_H, 6); ctx.stroke();
+        // arrow ↑
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#00e5ff';
+        ctx.font = `bold ${Math.round(PU_H * 0.72)}px system-ui,sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('↑', rx + PU_W / 2, ry + PU_H / 2);
         ctx.restore();
       }
 
@@ -433,12 +517,23 @@ function GameScreen({ card, cardColors, onClose, onShortcut }: GameScreenProps) 
             </Typography>
           </Typography>
           {playing && (
-            <Typography variant="body2" sx={{
-              mr: 2, fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem',
-              color: displayHealth > 50 ? '#2ecc71' : displayHealth > 25 ? '#f1c40f' : '#e74c3c',
-            }}>
-              HP {displayHealth}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: 2 }}>
+              {displayDoubleJumps > 0 && (
+                <Typography variant="body2" sx={{
+                  fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem',
+                  color: '#00e5ff',
+                  textShadow: '0 0 10px #00e5ff',
+                }}>
+                  {Array.from({ length: displayDoubleJumps }, (_, i) => '↑').join('')}
+                </Typography>
+              )}
+              <Typography variant="body2" sx={{
+                fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem',
+                color: displayHealth > 50 ? '#2ecc71' : displayHealth > 25 ? '#f1c40f' : '#e74c3c',
+              }}>
+                HP {displayHealth}
+              </Typography>
+            </Box>
           )}
           <IconButton color="inherit" onClick={onShortcut} aria-label="add shortcut">
             <IosShare sx={{ fontSize: '1.2rem' }} />
