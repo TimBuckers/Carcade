@@ -8,7 +8,7 @@ import { UI } from '../constants';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { logger } from '../utils/logger';
-import { incrementCardOpenCount } from '../services/cardService';
+import { incrementCardOpenCount, updateCardLevel } from '../services/cardService';
 import { shareOrCopyShortcut } from '../utils/cardShortcut';
 import GameScreen from './GameScreen';
 import {
@@ -25,7 +25,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { CreditCard, Casino, Close, LocationOn, IosShare } from '@mui/icons-material';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 
 interface CardListProps {
@@ -48,6 +48,7 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [locationDialogOpen, setLocationDialogOpen] = useState<boolean>(false);
+  const [levelOverrides, setLevelOverrides] = useState<Record<string, number>>({});
   // Whether all cards are flipped to show their level on the back face
   const [cardsFlipped, setCardsFlipped] = useState<boolean>(false);
   // Track whether we've already auto-opened the target card from the URL param
@@ -64,6 +65,25 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
     // handleCardClick is stable per render; intentionally omitted from deps to avoid loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetCardId, cards, deepLinkHandled]);
+
+  // Handle level-up from the game
+  const handleLevelComplete = useCallback(async (newLevel: number) => {
+    if (!selectedCard || !user) return;
+    const selectedCardId = selectedCard.id;
+    const ownerId = selectedCard.ownerId ?? user.uid;
+    const cardId  = selectedCard.ownerId
+      ? selectedCard.id.replace(`${selectedCard.ownerId}_`, '')
+      : selectedCard.id;
+    try {
+      await updateCardLevel(ownerId, cardId, newLevel);
+      setLevelOverrides(prev => ({ ...prev, [selectedCardId]: newLevel }));
+      setSelectedCard(prev => prev ? { ...prev, level: newLevel } : prev);
+      onCardUpdated();
+      logger.debug('Level saved to Firebase:', cardId, newLevel);
+    } catch (err) {
+      logger.error('Failed to save level:', err);
+    }
+  }, [selectedCard, user, onCardUpdated]);
 
   // Handle copy/share shortcut for the currently open card
   const handleShortcut = async () => {
@@ -164,12 +184,13 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
     };
   };
 
-  // Handle card click - increment counter and open modal
+  // Handle card click - increment counter only in normal (non-game) mode
   const handleCardClick = async (card: CardContent) => {
-    setSelectedCard(card);
+    const selectedLevel = levelOverrides[card.id] ?? card.level ?? 0;
+    setSelectedCard({ ...card, level: selectedLevel });
 
-    // Increment open count in database
-    if (user) {
+    // Do not count clicks used to enter/play game mode.
+    if (user && !cardsFlipped) {
       // For shared cards, the ID is in the format "ownerId_cardId"
       // We need to extract the real card ID and owner ID
       const ownerId = card.ownerId || user.uid;
@@ -406,7 +427,7 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
                           alignItems: 'center', justifyContent: 'center', mb: 1,
                         }}>
                           <Typography variant="h4" sx={{ color: '#fff', fontWeight: 'bold', lineHeight: 1 }}>
-                            {card.level ?? 0}
+                            {levelOverrides[card.id] ?? card.level ?? 0}
                           </Typography>
                         </Box>
                         <Typography variant="body2" sx={{ color: cardColors.secondary, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 'bold' }}>
@@ -476,6 +497,7 @@ function CardList({ cards, onCardUpdated, targetCardId }: CardListProps) {
           onClose={() => setSelectedCard(null)}
           onShortcut={handleShortcut}
           onOpenLocation={() => setLocationDialogOpen(true)}
+          onLevelComplete={handleLevelComplete}
         />
       )}
 

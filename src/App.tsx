@@ -311,6 +311,22 @@ function App() {
           onClose={() => setShowUserProfile(false)}
         />
       </Box>
+      {/* Version number bottom left */}
+      <Box sx={{
+        position: 'fixed',
+        left: 8,
+        bottom: 6,
+        zIndex: 2000,
+        color: 'rgba(0,0,0,0.18)',
+        fontSize: '0.72rem',
+        fontFamily: 'monospace',
+        letterSpacing: '0.04em',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        textShadow: '0 1px 4px #fff, 0 0px 1px #0001',
+      }}>
+        v20260308.1.0
+      </Box>
     </ThemeProvider>
   )
 }

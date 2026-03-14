@@ -26,6 +26,7 @@ export const fetchUserCards = async (userId: string): Promise<CardContent[]> => 
       barcode_type: doc.data().barcode_type,
       shop_locations: doc.data().shop_locations || null,
       openCount: doc.data().openCount || 0,
+      level: doc.data().level ?? 0,
     }));
   } catch (error) {
     logger.error('Error fetching user cards:', error);
